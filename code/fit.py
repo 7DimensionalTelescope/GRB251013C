@@ -7,43 +7,33 @@ from ultranest import stepsampler
 
 class Fitter:
     def __init__(self):
-        self.result = None
         self.fit_statistic = "chisq"
+        self.x_data = None
+        self.y_data = None
+        self.y_data_error = None
+        self.param_bounds = None
+        self.prior = None
 
-    @abstractmethod
-    def y_data(self):
-        pass
-
-    @abstractmethod
-    def x_data(self):
-        pass
-    
     @abstractmethod
     def model(self, x_data, *params):
         pass
     
-    @abstractmethod
-    def param_bounds(self):
-        pass
-
-    @abstractmethod
-    def prior(self):
-        return 0
-
-    
-
     def y_model(self, params):
         return self.model(self.x_data, *params)
 
     def log_likelihood(self, params, rescale=True):
         if rescale:
-            y_data = self.y_data / min(self.y_data_error)
-            y_model = self.model(self.x_data, *params) / min(self.y_data_error)
-            y_err = self.y_data_error / min(self.y_data_error)
+            if self.y_data_error is None:
+                scale_factor = min(self.y_data)
+            else:
+                scale_factor = min(self.y_data_error)
         else:
-            y_data = self.y_data
-            y_model = self.model(self.x_data, *params)
-            y_err = self.y_data_error
+            scale_factor = 1
+
+        y_data = self.y_data / scale_factor
+        y_model = self.model(self.x_data, *params) / scale_factor
+        if self.y_data_error is not None:
+            y_err = self.y_data_error / scale_factor
 
         if self.fit_statistic == "chisq":
             if self.y_data_error is None:
@@ -72,6 +62,9 @@ class Fitter:
         
     def run(self, log_dir=None, num_live_points=300, nsteps=None):
         # Create UltraNest sampler
+        if self.model is None:
+            raise ValueError("Model not set, Analyzer.model must be set first")
+
         if log_dir == True:
             log_dir = f"ultranest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 

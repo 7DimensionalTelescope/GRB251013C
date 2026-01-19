@@ -4,6 +4,7 @@ import numpy as np
 def plot_lightcurve(df, label=None, ls="", **kwargs):
 
     ax = kwargs.pop("ax", None)
+    
     if ax is None:
         ax = plt.gca()
         invert_yaxis = True
@@ -13,7 +14,7 @@ def plot_lightcurve(df, label=None, ls="", **kwargs):
     data = []
     for idx, row in df.iterrows():
         try:
-            data.append([float(row["T-T0"]), float(row["Mag"]), float(row["Error"]), False])
+            data.append([float(row["Time"]), float(row["Mag"]), float(row["Error"]), False])
         except:
             continue
             #data.append([float(row["T-T0"]), row["Mag"], row["Error"], True])

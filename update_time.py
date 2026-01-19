@@ -36,6 +36,8 @@ if __name__ == "__main__":
     df["T-T0"] = updated_t_diff
     df["T-T0"] = df["T-T0"].round(2)
 
+    df.rename(columns={"T-T0": "Time"}, inplace=True)
+
     df.sort_values(by="Starting Date", inplace=True)
     
     df.to_excel(f"{DATA_DIR}/circular.xlsx", index=False)

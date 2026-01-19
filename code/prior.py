@@ -5,9 +5,10 @@ def power_law_prior():
         "alpha": (0, 5),
     }, {"F0": "log_uniform", "alpha": "uniform"}
 
-def smooth_broken_power_law_prior():
+def broken_power_law_prior():
     return {
-        "F0": (1e-5, 1e2),
-        "alpha": (0, 10),
-        "beta": (0, 10),
-    }, {"F0": "log_uniform", "alpha": "uniform", "beta": "uniform"}
+        "F_break": (1e-15, 1e1),
+        "t_break": (1e-2, 1e3),
+        "alpha1": (0, 5),
+        "alpha2": (0, 5),
+    }, {"F_break": "log_uniform", "t_break": "log_uniform", "alpha1": "uniform", "alpha2": "uniform"}
