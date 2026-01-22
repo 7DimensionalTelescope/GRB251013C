@@ -42,14 +42,14 @@ class Analyzer(Fitter):
 
     @property
     def x_model(self):
-        return np.geomspace(min(self.x_data), max(self.x_data), 100)
+        return np.geomspace(min(self.x_data)*0.8, max(self.x_data)*1.2, 100)
     
     @property
     def y_model(self):
         return self.model(self.x_model, *self.best_fit_params)
 
 
-    def plot_data(self, ax=None, **kwargs):
+    def plot_data(self, ax=None, scale=1, **kwargs):
         if ax is None:
             ax = plt.gca()
 
@@ -57,9 +57,9 @@ class Analyzer(Fitter):
         y_label = kwargs.pop("ylabel", "Flux")
 
         if self.y_data_error is not None:
-            ax.errorbar(self.x_data, self.y_data, yerr=self.y_data_error, ls="", **kwargs)
+            ax.errorbar(self.x_data, self.y_data*scale, yerr=self.y_data_error*scale, ls="", **kwargs)
         else:
-            ax.plot(self.x_data, self.y_data, marker=kwargs.pop("marker", "o"), ls="", **kwargs)
+            ax.plot(self.x_data, self.y_data*scale, marker=kwargs.pop("marker", "o"), ls="", **kwargs)
 
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -67,7 +67,7 @@ class Analyzer(Fitter):
         ax.set_ylabel(y_label)
         return ax
 
-    def plot_model(self, ax=None, **kwargs):
+    def plot_model(self, ax=None, scale=1, **kwargs):
 
         if ax is None:
             ax = plt.gca()
@@ -81,7 +81,7 @@ class Analyzer(Fitter):
         else:
             y_model = self.y_model
 
-        ax.plot(self.x_model, y_model, **kwargs)
+        ax.plot(self.x_model, y_model*scale, **kwargs)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel(x_label)

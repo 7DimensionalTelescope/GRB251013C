@@ -54,8 +54,8 @@ class Fitter:
                 params_transformed[i] = cube[i] * (bounds[1] - bounds[0]) + bounds[0]
             elif self.prior[param] == "log_uniform":
                 params_transformed[i] = 10**(cube[i] * (np.log10(bounds[1]) - np.log10(bounds[0])) + np.log10(bounds[0]))
-            elif self.prior[param] == "normal":
-                params_transformed[i] = cube[i] * 10**scipy.stats.norm.ppf(cube[i], bounds[0], bounds[1])
+            elif self.prior[param] == "norm":
+                params_transformed[i] = scipy.stats.norm.ppf(cube[i], loc=bounds[0], scale=bounds[1])
             else:
                 raise ValueError(f"Prior {self.prior[param]} not supported")
         return params_transformed

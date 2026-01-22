@@ -6,47 +6,43 @@ def power_law(t, F0, alpha, t0 = 1):
 def power_law_log(t, log_F0, alpha, t0 = 1):
     return np.log10(power_law(t, 10**log_F0, alpha, t0))
                                                      
-def broken_power_law(t, F_break, t_break, alpha1, alpha2):
+def broken_power_law(t, F_break, t_break, alpha_1, alpha_2, t0 = 1):
     """
-    F(t) = F_break * (t / t_break)^(-alpha1) for t < t_break
-    F(t) = F_break * (t / t_break)^(-alpha2) for t >= t_break
+    F(t) = F_break * (t / tbreak)^(-alpha1) for t < t_break
+    F(t) = F_break * (t / tbreak)^(-alpha2) for t >= t_break
     """
     t_safe = np.maximum(t, 1e-10)
-    t_break_safe = max(t_break, 1e-10)
-    
-    t_ratio = t_safe / t_break_safe
-    
-    result = np.where(t_safe < t_break_safe,
-                     F_break * t_ratio**(-alpha1),  # Early: t < t_break
-                     F_break * t_ratio**(-alpha2))  # Late: t ≥ t_break
-    
-    return np.maximum(result, 1e-100)  # Ensure positive
+    t0_safe = max(t0, 1e-10)
+    t_ratio = t_safe / t0_safe
+    result = np.where(t_safe < t_break,
+                      F_break * (t / t_break)**(-alpha_1),
+                      F_break * (t / t_break)**(-alpha_2))
+    return np.maximum(result, 1e-100)
 
-
-def broken_power_law_log(t, log_F_break, log_t_break, alpha1, alpha2):
+def broken_power_law_log(t, log_F_break, log_t_break, alpha1, alpha2, t0 = 1):
     """
-    F(t) = F_break * (t / t_break)^(-alpha1) for t < t_break
-    F(t) = F_break * (t / t_break)^(-alpha2) for t >= t_break
+    F(t) = F_break * (t / t0)^(-alpha1) for t < t_break
+    F(t) = F_break * t_break^(alpha2-alpha1) * (t / t0)^(-alpha2) for t >= t_break
     """
     F = broken_power_law(t, np.power(10, log_F_break), np.power(10, log_t_break), alpha1, alpha2)
     return np.log10(F)
 
 
-def smooth_broken_power_law(t, F0, tb, alpha_r, alpha_d, kappa):
+def smooth_broken_power_law(t, F0, tb, alpha_r, alpha_d, smooth_power):
     """
-    F(t) = F0 / [(t/tb)^(kappa*alpha_r) + (t/tb)^(kappa*alpha_d)]^(1/kappa)
+    F(t) = F0 * (t/tb)^(-alpha_r) * (0.5 * (1 + (t/tb)^(1/smooth_power)))**((alpha_r - alpha_d) * smooth_power)
     """
-    t_safe = np.maximum(t, 1e-10)
-    tb_safe = max(tb, 1e-10)
-    
-    ratio = t_safe / tb_safe
-    term1 = np.power(ratio, kappa * alpha_r)
-    term2 = np.power(ratio, kappa * alpha_d)
-    denominator = np.power(term1 + term2, 1.0 / kappa)
-    
-    result = F0 / np.maximum(denominator, 1e-100)
-    return np.maximum(result, 1e-100)
 
+    ratio = t / tb
+    
+    # Power law component
+    term1 = ratio**(-alpha_r)
+    
+    
+    smooth_factor = (0.5 * (1 + ratio**(1/smooth_power)))**((alpha_r - alpha_d) * smooth_power)
+    
+    return F0 * term1 * smooth_factor
+    
 
 def smooth_broken_power_law_log(t, log_F0, log_tb, alpha_r, alpha_d, kappa):
     """

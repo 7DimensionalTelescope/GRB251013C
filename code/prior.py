@@ -8,7 +8,16 @@ def power_law_prior():
 def broken_power_law_prior():
     return {
         "F_break": (1e-15, 1e1),
-        "t_break": (1e-2, 1e3),
-        "alpha1": (0, 5),
-        "alpha2": (0, 5),
-    }, {"F_break": "log_uniform", "t_break": "log_uniform", "alpha1": "uniform", "alpha2": "uniform"}
+        "t_break": (1e-1, 100),
+        "alpha_1": (0, 5),
+        "alpha_2": (0, 5),
+    }, {"F_break": "log_uniform", "t_break": "log_uniform", "alpha_1": "uniform", "alpha_2": "uniform"}
+
+def smooth_broken_power_law_prior():
+    return {
+        "F0": (1e-15, 1e1),
+        "tb": (2, 100),
+        "alpha_r": (0, 5),
+        "alpha_d": (0, 5),
+        "smooth_power": (1e-2, 1),
+    }, {"F0": "log_uniform", "tb": "log_uniform", "alpha_r": "uniform", "alpha_d": "uniform", "smooth_power": "log_uniform"}
