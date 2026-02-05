@@ -1,13 +1,23 @@
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT_DIR = os.path.abspath(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CIRCULAR_DATA_FILENAME = os.path.join(DATA_DIR, "circular.xlsx")
 XRT_DATA_FILENAME = os.path.join(DATA_DIR, "xrt.csv")
+SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
 
-TRIGGER_TIME_STR = "2025-10-13T17:39:42 UTC"
-TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S %Z")
+RA = float(os.getenv("ra"))
+DEC = float(os.getenv("dec"))
+REDSHIFT = float(os.getenv("redshift"))
+
+TRIGGER_TIME_STR = str(os.getenv("trigger_time"))
+TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S UTC")
+
 
 FILTER_INFO = {
     # Johnson–Cousins (Vega)

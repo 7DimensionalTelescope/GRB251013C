@@ -1,14 +1,15 @@
 import copy
+import os
 import pandas as pd
 
 import numpy as np
 
-from .const import CIRCULAR_DATA_FILENAME, XRT_DATA_FILENAME
+from .const import DATA_DIR, CIRCULAR_DATA_FILENAME, XRT_DATA_FILENAME
 
-def read_data(filename):
+
+def read_data(filename, **kwargs):
     if filename == "circular":
         filename = CIRCULAR_DATA_FILENAME
-        kwargs = {}
     elif filename == "xrt":
         filename = XRT_DATA_FILENAME
         kwargs = {
@@ -16,7 +17,12 @@ def read_data(filename):
             "header": None,
             "names": ["Time", "Time_high", "Time_low", "Flux", "Flux_high", "Flux_low"]
         }
-
+    elif filename == "sdt":
+        filename = SDT_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+        }
+        
     if filename.endswith(".csv"):
         return pd.read_csv(filename, **kwargs)
     elif filename.endswith(".xlsx"):
@@ -42,8 +48,8 @@ def filter_data(df, filter_name=None, facility_name = None, exclude_time_range=N
         filtered_df = filtered_df[~filtered_df["Time"].between(exclude_time_range[0], exclude_time_range[1])]
 
     if remove_upper_limits:
-        _test = filtered_df["Mag"]
-        upper_limits = np.array([">" in str(v) for v in _test])
+        upper_limits = filtered_df["Upper Limit"]
         filtered_df = filtered_df[~upper_limits]
 
     return filtered_df
+
