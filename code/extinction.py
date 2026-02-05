@@ -1,81 +1,78 @@
-from pathlib import Path
+import numpy as np
+
+from astropy import units as u
 from astropy.io import ascii as asc
+from astropy.coordinates import SkyCoord
+
 from scipy.interpolate import interp1d
 from .const import DATA_DIR
 
-def galactic_extinction(bandpass, system = ["SDSS", "Landolt", "UKIRT", "PS1"]):
-    tab = asc.read(f"{DATA_DIR}/extinction_calculator.csv")
-    tab = tab[tab['Refcode of the publications']=="2011ApJ...737..103S"]
-    
-    if bandpass == "Ks":
-        bandpass = "K"
-    elif bandpass == "Y":
-        bandpass = "y"
-    
-    band = [str(sys) + " " + str(bandpass) for sys in system]
-    unique_band = [tab[tab["Bandpass"] == b] for b in band if b in tab["Bandpass"]]
-    
-    if len(unique_band) >= 1:
-        return unique_band[0]
-    else:
-        return None
+import extinction
+from dustmaps.sfd import SFDQuery
+import pandas as pd
+import copy
 
-def galactic_extinction_wavelength(wavelength, wavelength_unit='micron', E_BV=1.0):
-    """
-    Get Galactic extinction for a specific wavelength using Schlafly & Finkbeiner (2011)
+def correct_galactic_extinction(df, magnitude_column="magnitude", wavelength_column="wavelength", **kwargs):
     
-    Args:
-        wavelength: wavelength value (can be scalar or array)
-        wavelength_unit: unit of wavelength ('micron', 'nm', 'angstrom')
-        E_BV: color excess E(B-V) (default 1.0, returns A_λ/E(B-V))
-    
-    Returns:
-        A_λ or A_λ/E(B-V) depending on E_BV value
-    """
-    tab = asc.read(f"{DATA_DIR}/extinction_calculator.csv")
-    tab = tab[tab['Refcode of the publications']=="2011ApJ...737..103S"]
-    
-    # Convert wavelength to microns for interpolation
-    if wavelength_unit == 'nm':
-        wavelength_micron = wavelength / 1000.0
-    elif wavelength_unit == 'angstrom' or wavelength_unit == 'angstroms':
-        wavelength_micron = wavelength / 10000.0
-    elif wavelength_unit == 'micron' or wavelength_unit == 'microns':
-        wavelength_micron = wavelength
+    if "gal_corrected" in df.columns and df["corrected"].all():
+        print("Extinction already corrected")
+        return df
+    elif "gal_corrected" in df.columns and df["gal_corrected"].any():
+        print("Extinction partially corrected")
+        uncorrected_df = df[~df["gal_corrected"]]
+        corrected_df = df[df["gal_corrected"]]
     else:
-        raise ValueError(f"Unknown wavelength_unit: {wavelength_unit}")
-    
-    # Get wavelength and extinction data
-    wl_data = tab['Central Wavelength'].data  # in microns
-    A_data = tab['Galactic Extinction'].data   # A_λ/E(B-V) or similar
-    
-    # Interpolate extinction for requested wavelength(s)
-    interp_func = interp1d(wl_data, A_data, kind='linear', 
-                          bounds_error=False, fill_value='extrapolate')
-    
-    A_lambda_over_EBV = interp_func(wavelength_micron)
-    
-    # Return A_λ = (A_λ/E(B-V)) * E(B-V)
-    return A_lambda_over_EBV * E_BV
+        uncorrected_df = copy.deepcopy(df)
+        corrected_df = pd.DataFrame()
 
-def host_galaxy_extinction(model, nu=None, z=None, show_plot=False, **kwargs):
+    extinc = galactic_extinction(uncorrected_df[wavelength_column], **kwargs)
+    uncorrected_df[magnitude_column] -= extinc
+    uncorrected_df["gal_extinction"] = extinc
+    uncorrected_df["gal_corrected"] = True
+    return pd.concat([corrected_df, uncorrected_df])
+
+def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99",wavelength_unit='AA', rv=3.1):
+
+    if (ra is not None) and (dec is not None):
+        coords = SkyCoord(ra=ra, dec=dec, unit='deg', frame='icrs')
+    else:
+        from .const import RA, DEC
+        coords = SkyCoord(ra=RA, dec=DEC, unit='deg', frame='icrs')
+
+    sfd = SFDQuery()
+    ebv = sfd(coords)
+    
+    av = rv * ebv
+    
+    wavelengths_aa = u.Quantity(wavelength, wavelength_unit).to(u.AA).value
+
+    if model == "fitzpatrick99":
+        extinc = extinction.fitzpatrick99(np.array(wavelengths_aa), av)
+    else:
+        raise ValueError(f"Invalid model: {model}")
+
+    return extinc
+
+def host_galaxy_extinction_curve(wavelength, z=None, model="MW", wavelength_unit='AA'):
+    from .utils import wavelength_to_frequency
+
+    if z is None:
+        from .const import REDSHIFT
+        z = REDSHIFT
+
+    if model not in ["MW", "SMC", "LMC"]:
+        raise ValueError(f"Invalid model: {model}")
+
     tab = asc.read(f"{DATA_DIR}/host_galaxy_extinction.csv")
-    if show_plot:
-        import matplotlib.pyplot as plt
-        ax = plt.gca()
-        ax.plot(tab[f"nu_{model}"], tab[f"eta_{model}"], **kwargs)
-        ax.set_xlabel("Rest frequency [Hz]", fontsize=13)
-        ax.set_ylabel(r"$\eta$($\nu$)", fontsize=13)
-        ax.set_xscale("log")
 
-    else:
-        eta_model = interp1d(tab[f"nu_{model}"], tab[f"eta_{model}"])
-        if (nu is not None) and (z is not None):
-            # nu is observed frequency, convert to rest-frame: nu_rest = nu_obs * (1+z)
-            # The table has rest-frame frequencies
-            return eta_model(nu * (1. + z))
-        elif nu is not None:
-            # If z not provided, assume nu is already rest-frame
-            return eta_model(nu)
-        else:
-            return eta_model
+    interp_func = interp1d(tab[f"nu_{model}"], tab[f"eta_{model}"], 
+                          bounds_error=False, fill_value="extrapolate")
+
+    nu = wavelength_to_frequency(wavelength, wavelength_unit).value
+    nu_rest = nu_obs * (1. + z)
+    eta = interp_func(nu_rest)
+    return eta
+
+def host_galaxy_extinction(Av, wavelength, **kwargs):
+    eta = host_galaxy_extinction_curve(wavelength, **kwargs)
+    return np.exp(-eta * Av / 1.086)

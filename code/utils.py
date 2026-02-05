@@ -1,5 +1,11 @@
 import numpy as np
 from .const import FILTER_INFO
+from astropy import constants as const
+from astropy import units as u
+
+def wavelength_to_frequency(wavelength, wavelength_unit='AA'):
+    wavelength = u.Quantity(wavelength, wavelength_unit)
+    return (const.c / wavelength).to(u.Hz)
 
 def mag_to_flux_jy(df, add_error=False):
 

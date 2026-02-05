@@ -1,16 +1,12 @@
 import copy
-import os
 import pandas as pd
 
-import numpy as np
-
-from .const import DATA_DIR, CIRCULAR_DATA_FILENAME, XRT_DATA_FILENAME
-
-
-def read_data(filename, **kwargs):
+def read_data(filename, correct_galactic_extinction=False):
     if filename == "circular":
+        from .const import CIRCULAR_DATA_FILENAME
         filename = CIRCULAR_DATA_FILENAME
     elif filename == "xrt":
+        from .const import XRT_DATA_FILENAME
         filename = XRT_DATA_FILENAME
         kwargs = {
             "sep": "\t",
@@ -18,17 +14,24 @@ def read_data(filename, **kwargs):
             "names": ["Time", "Time_high", "Time_low", "Flux", "Flux_high", "Flux_low"]
         }
     elif filename == "sdt":
+        from .const import SDT_DATA_FILENAME
         filename = SDT_DATA_FILENAME
         kwargs = {
             "sep": ",",
         }
         
     if filename.endswith(".csv"):
-        return pd.read_csv(filename, **kwargs)
+        df = pd.read_csv(filename, **kwargs)
     elif filename.endswith(".xlsx"):
-        return pd.read_excel(filename, **kwargs)
+        df = pd.read_excel(filename, **kwargs)
     else:
         raise ValueError(f"Unsupported file extension: {filename}")
+    
+    if correct_galactic_extinction:
+        from .extinction import correct_galactic_extinction
+        df = correct_galactic_extinction(df)
+    
+    return df
 
 def filter_data(df, filter_name=None, facility_name = None, exclude_time_range=None, remove_upper_limits=False):
     filtered_df = copy.deepcopy(df)
