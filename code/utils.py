@@ -48,7 +48,7 @@ def _flux_from_filter(mag, mag_err, filter_name):
         info = FILTER_INFO[filter_name]
         wl, bw = info["central_wavelength_nm"], info["bandwidth_nm"]
         if info["system"] == "AB":
-            zero_point = info["zero_point_jy"]
+            zero_point = 3631
         elif info["system"] == "Vega":
             zero_point = info["vega_zero_point_jy"]
         elif info["system"] == "instrumental":

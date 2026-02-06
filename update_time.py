@@ -39,9 +39,7 @@ if __name__ == "__main__":
             else:
                 raise ValueError(f"Unknown time format: {t_diff}")
 
-        if "\xa0" in name:
-            name = name.replace("\xa0", "")
-        
+        name = name.replace("\xa0", "")
         name = name.replace(" ", "")
         name = name.replace('"', "")
 
