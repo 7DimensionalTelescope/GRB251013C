@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.table import Table
 
-from .utils import mag_to_flux_jy
+from .utils import mag_to_flux_mJy
 
 def prepare_lc_data(df, mag_to_flux=False, filter_name=None):
     tab = Table.from_pandas(df)[["Time", "Mag", "Error"]]
     tab.rename_columns(["Time", "Mag", "Error"], ["t", "y", "y_err"])
     if mag_to_flux and filter_name is not None:
-        tab["y"] = mag_to_flux_jy(tab["y"], filter_name)
+        tab["y"] = mag_to_flux_mJy(tab["y"], filter_name)
         #tab["y_err"] = mag_to_flux_jy(tab["y_err"], filter_name)
 
     tab.add_column(np.zeros(len(tab)), name="t_err")

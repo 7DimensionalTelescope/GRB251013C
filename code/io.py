@@ -33,8 +33,8 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
         df = correct_galactic_extinction(df)
 
     if add_converted_flux:
-        from .utils import mag_to_flux_jy
-        df = mag_to_flux_jy(df)
+        from .utils import mag_to_flux_mJy
+        df = mag_to_flux_mJy(df)
     
     return df
 

@@ -40,9 +40,10 @@ if __name__ == "__main__":
                 raise ValueError(f"Unknown time format: {t_diff}")
 
         if "\xa0" in name:
-            name.replace("\xa0", "")
-        else:
-            name = name
+            name = name.replace("\xa0", "")
+        
+        name = name.replace(" ", "")
+        name = name.replace('"', "")
 
         if isinstance(val, str) and ">" in val:
             val = float(val.replace(">", ""))
