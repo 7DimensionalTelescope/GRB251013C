@@ -1,10 +1,10 @@
 import numpy as np
 
-def power_law(t, F0, alpha, t0 = 1):
-    return F0 * np.power(t / t0, -alpha)
+def power_law(x, F0, index, x0 = 1):
+    return F0 * np.power(x / x0, -index)
 
-def power_law_log(t, log_F0, alpha, t0 = 1):
-    return np.log10(power_law(t, 10**log_F0, alpha, t0))
+def power_law_log(x, log_F0, index, x0 = 1):
+    return np.log10(power_law(x, 10**log_F0, index, x0))
                                                      
 def broken_power_law(t, F_break, t_break, alpha_1, alpha_2, t0 = 1):
     """

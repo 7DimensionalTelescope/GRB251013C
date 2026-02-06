@@ -23,6 +23,8 @@ if __name__ == "__main__":
         elif isinstance(time, str):
             if "/" in time:
                 time = datetime.strptime(time, '%Y/%m/%d %H:%M:%S')
+            elif "T" in time:
+                time = datetime.fromisoformat(time)
             else:
                 time = datetime.fromisoformat(Time(float(time), format='jd', scale='utc').iso)
         else:

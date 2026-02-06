@@ -113,25 +113,25 @@ FILTER_INFO = {
     "Clear": {
         "system": "instrumental",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 600,
-        "bandwidth_nm": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
     },
     "clear": {
         "system": "instrumental",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 600,
-        "bandwidth_nm": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
     },
     "white": {
         "system": "instrumental",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 600,
-        "bandwidth_nm": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
     },
     "w": {
         "system": "instrumental",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 600,
-        "bandwidth_nm": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
     },
 }

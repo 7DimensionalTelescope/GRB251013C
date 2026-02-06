@@ -49,18 +49,21 @@ class Fitter:
     def prior_transform(self, cube):
         """Transform the unit cube to the parameter space"""
         params_transformed = np.zeros_like(cube)
-        for i, (param, bounds) in enumerate( self.param_bounds.items()):
+        for i, (param, bounds) in enumerate(self.param_bounds.items()):
             if self.prior[param] == "uniform":
                 params_transformed[i] = cube[i] * (bounds[1] - bounds[0]) + bounds[0]
             elif self.prior[param] == "log_uniform":
                 params_transformed[i] = 10**(cube[i] * (np.log10(bounds[1]) - np.log10(bounds[0])) + np.log10(bounds[0]))
             elif self.prior[param] == "norm":
                 params_transformed[i] = scipy.stats.norm.ppf(cube[i], loc=bounds[0], scale=bounds[1])
+            elif self.prior[param] == "log_norm":
+                param_log = scipy.stats.norm.ppf(cube[i], loc=bounds[0], scale=bounds[1])
+                params_transformed[i] = 10**param_log
             else:
                 raise ValueError(f"Prior {self.prior[param]} not supported")
         return params_transformed
         
-    def run(self, log_dir=None, num_live_points=300, nsteps=None):
+    def run(self, log_dir=None, num_live_points=300, nsteps=None, use_slice_sampler=False):
         # Create UltraNest sampler
         if self.model is None:
             raise ValueError("Model not set, Analyzer.model must be set first")
@@ -68,8 +71,6 @@ class Fitter:
         if log_dir == True:
             log_dir = f"ultranest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        if nsteps is None:
-            nsteps = 2 * len(self.params)
 
         self.sampler = ultranest.ReactiveNestedSampler(
             self.params,
@@ -77,12 +78,14 @@ class Fitter:
             self.prior_transform,
             log_dir=log_dir,)
 
+        if nsteps is None:
+            nsteps = 2 * len(self.params)
+
         self.sampler.stepsampler = stepsampler.SliceSampler(
             nsteps=nsteps,
             generate_direction=stepsampler.generate_mixture_random_direction,
         )
 
-        # run again:
         self.results = self.sampler.run(
                 min_num_live_points=num_live_points,
             )

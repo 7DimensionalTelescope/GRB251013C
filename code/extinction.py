@@ -53,8 +53,7 @@ def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99",wav
 
     return extinc
 
-def host_galaxy_extinction_curve(wavelength, z=None, model="MW", wavelength_unit='AA'):
-    from .utils import wavelength_to_frequency
+def host_galaxy_extinction_curve(nu_obs, z=None, model="MW", wavelength_unit='AA'):
 
     if z is None:
         from .const import REDSHIFT
@@ -68,11 +67,16 @@ def host_galaxy_extinction_curve(wavelength, z=None, model="MW", wavelength_unit
     interp_func = interp1d(tab[f"nu_{model}"], tab[f"eta_{model}"], 
                           bounds_error=False, fill_value="extrapolate")
 
-    nu = wavelength_to_frequency(wavelength, wavelength_unit).value
     nu_rest = nu_obs * (1. + z)
     eta = interp_func(nu_rest)
     return eta
 
-def host_galaxy_extinction(Av, wavelength, **kwargs):
-    eta = host_galaxy_extinction_curve(wavelength, **kwargs)
+def host_galaxy_extinction(nu_obs, Av, eta=None, **kwargs):
+
+    if eta is None:
+        eta = host_galaxy_extinction_curve(nu_obs, **kwargs)
+    
+    elif len(eta) != len(nu_obs):
+        eta = host_galaxy_extinction_curve(nu_obs, **kwargs)
+
     return np.exp(-eta * Av / 1.086)
