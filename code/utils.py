@@ -17,7 +17,7 @@ def mag_to_flux_mJy(df):
         unit = "AA"
         flx_list, flx_err_list = [], []
         for m, e in zip(mag, mag_err):
-            f, fe = _mag_to_flux_jy(m, e)
+            f, fe = _mag_to_flux_mJy(m, e)
             flx_list.append(f)
             flx_err_list.append(fe)
     elif "Filter" in df.columns:
@@ -38,8 +38,8 @@ def mag_to_flux_mJy(df):
         _wavelength_to_frequency(wl_arr - np.asarray(bandwidths) / 2.0, wavelength_unit=unit).value
         - df["frequency_Hz"]
     )
-    df["flux_mJy"] = flx_list * 1e3
-    df["flux_error_mJy"] = flx_err_list * 1e3
+    df["flux_mJy"] = flx_list
+    df["flux_error_mJy"] = flx_err_list 
     return df
 
 def _flux_from_filter(mag, mag_err, filter_name):
@@ -56,18 +56,18 @@ def _flux_from_filter(mag, mag_err, filter_name):
         else:
             return None, None, wl, bw
             
-        flx, flx_err = _mag_to_flux_jy(mag, mag_err, zero_point=zero_point)
+        flx, flx_err = _mag_to_flux_mJy(mag, mag_err, zero_point=zero_point)
         
         return flx, flx_err, wl, bw
     if isinstance(filter_name, str) and filter_name.startswith("m"):
         wl = float(filter_name.replace("m", ""))
         
-        flx, flx_err = _mag_to_flux_jy(mag, mag_err)
+        flx, flx_err = _mag_to_flux_mJy(mag, mag_err)
         return flx, flx_err, wl, 250.0
     return None, None, np.nan, np.nan
 
-def _mag_to_flux_jy(mag, mag_err=None, zero_point=3631):
-    flux_jy = zero_point*10**(-0.4 * mag)
+def _mag_to_flux_mJy(mag, mag_err=None, zero_point=3631):
+    flux_jy = zero_point*10**(-0.4 * mag) * 1e3
     if mag_err is not None:
         flux_jy_err = flux_jy * (np.log(10) * 0.4) * mag_err
     else:

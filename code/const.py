@@ -64,51 +64,48 @@ FILTER_INFO = {
         "central_wavelength_nm": 3450,
         "bandwidth_nm": 570,
     },
-
-    # SDSS / Sloan (AB)
     "u": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 355,
-        "bandwidth_nm": 57,
+        "central_wavelength_nm": 360.8,
+        "bandwidth_nm": 56.4,
     },
     "g": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 475,
-        "bandwidth_nm": 138,
+        "central_wavelength_nm": 467.1,
+        "bandwidth_nm": 106.5,
     },
     "g'": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 477,
-        "bandwidth_nm": 137,
+        "central_wavelength_nm": 472.3,
+        "bandwidth_nm": 126.5,
     },
     "r": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 622,
-        "bandwidth_nm": 138,
+        "central_wavelength_nm": 614.1,
+        "bandwidth_nm": 105.5,
     },
     "r'": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 623,
-        "bandwidth_nm": 137,
+        "central_wavelength_nm": 620.2,
+        "bandwidth_nm": 125.4,
     },
     "i": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 763,
-        "bandwidth_nm": 153,
+        "central_wavelength_nm": 745.8,
+        "bandwidth_nm": 110.3,
     },
     "z": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 905,
-        "bandwidth_nm": 137,
+        "central_wavelength_nm": 892.3,
+        "bandwidth_nm": 116.4,
     },
-
     # Unfiltered / instrumental
     "Clear": {
         "system": "instrumental",
