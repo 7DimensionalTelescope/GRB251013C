@@ -10,9 +10,17 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
         from .const import XRT_DATA_FILENAME
         filename = XRT_DATA_FILENAME
         kwargs = {
-            "sep": "\t",
+            "sep": ",",
             "header": None,
             "names": ["Time", "Time_high", "Time_low", "Flux", "Flux_high", "Flux_low"]
+        }
+    elif filename == "xrt_index":
+        from .const import XRT_INDEX_DATA_FILENAME
+        filename = XRT_INDEX_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+            "header": None,
+            "names": ["Time", "Time_high", "Time_low", "Index", "Index_high", "Index_low"]
         }
     elif filename == "sdt":
         from .const import SDT_DATA_FILENAME

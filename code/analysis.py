@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from .fit import Fitter
+from .utils import mask_data
 
 class Analyzer(Fitter):
 
@@ -15,10 +16,18 @@ class Analyzer(Fitter):
         if isinstance(y_data, pd.Series):
             y_data = y_data.to_numpy("float")
 
-        self.x_data = x_data
-        self.y_data = y_data
-        self.x_data_error = x_data_error
-        self.y_data_error = y_data_error
+        mask = mask_data(x_data, y_data, x_data_error, y_data_error)
+
+        self.x_data = x_data[mask]
+        self.y_data = y_data[mask]
+        if x_data_error is not None:
+            self.x_data_error = x_data_error[mask]
+        else:
+            self.x_data_error = None
+        if y_data_error is not None:
+            self.y_data_error = y_data_error[mask]
+        else:
+            self.y_data_error = None
         
         self.data_type = data_type
         self.model = model
@@ -29,6 +38,8 @@ class Analyzer(Fitter):
             self._x_damper = 0.2
         elif self.data_type == "sed":
             self._x_damper = 0.05
+
+
         
     def set_params(self, param_bounds=None, prior=None):
 

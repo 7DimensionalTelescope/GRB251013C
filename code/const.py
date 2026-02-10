@@ -10,6 +10,7 @@ SCRIPT_DIR = os.path.abspath(__file__)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CIRCULAR_DATA_FILENAME = os.path.join(DATA_DIR, "circular.xlsx")
 XRT_DATA_FILENAME = os.path.join(DATA_DIR, "xrt.csv")
+XRT_INDEX_DATA_FILENAME = os.path.join(DATA_DIR, "xrt_index.csv")
 SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
 
 RA = float(os.getenv("ra"))
@@ -114,8 +115,8 @@ FILTER_INFO = {
         "bandwidth_nm": 0,
     },
     "clear": {
-        "system": "instrumental",
-        "vega_zero_point_jy": None,
+        "system": "Vega",
+        "vega_zero_point_jy": 3064,
         "central_wavelength_nm": 0,
         "bandwidth_nm": 0,
     },

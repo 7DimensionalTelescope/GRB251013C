@@ -80,3 +80,17 @@ def _wavelength_to_frequency(wavelength, wavelength_unit='AA'):
     frequency = (const.c / u.Quantity(safe_wl, wavelength_unit)).to(u.Hz)
     return frequency
 
+
+def mask_data(x_data, y_data, x_data_error=None, y_data_error=None):
+    mask_y = np.isfinite(y_data) & (y_data > 0)
+    mask_x = np.isfinite(x_data) & (x_data > 0)
+    if x_data_error is not None:
+        mask_x_error = np.isfinite(x_data_error) & (x_data_error > 0)
+    else:
+        mask_x_error = True
+    if y_data_error is not None:
+        mask_y_error = np.isfinite(y_data_error) & (y_data_error > 0)
+    else:
+        mask_y_error = True
+    mask = mask_y & mask_x & mask_x_error & mask_y_error
+    return mask
