@@ -12,5 +12,5 @@ ultranest==4.4.0
 
 extinction==0.4.8
 jupyter==1.1.1
-VegasAfterglow
+VegasAfterglow==1.1.0
 VegasAfterglow[mcmc]
