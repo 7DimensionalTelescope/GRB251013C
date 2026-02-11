@@ -10,7 +10,7 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
         from .const import XRT_DATA_FILENAME
         filename = XRT_DATA_FILENAME
         kwargs = {
-            "sep": ",",
+            "sep": "\t",
             "header": None,
             "names": ["Time", "Time_high", "Time_low", "Flux", "Flux_high", "Flux_low"]
         }
