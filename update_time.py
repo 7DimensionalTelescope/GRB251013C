@@ -1,7 +1,7 @@
 import numpy as np
 import os
-from code.io import read_data
-from code.const import TRIGGER_TIME,DATA_DIR
+from grb.io import read_data
+from grb.const import TRIGGER_TIME,DATA_DIR
 from datetime import datetime, timedelta
 from astropy.time import Time
 
