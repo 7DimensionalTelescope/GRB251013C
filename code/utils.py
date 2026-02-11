@@ -33,9 +33,9 @@ def mag_to_flux_mJy(df):
         raise ValueError("Wavelength or Filter column not found")
 
     wl_arr = np.asarray(wavelengths)
-    df["frequency_Hz"] = _wavelength_to_frequency(wl_arr, wavelength_unit=unit).value
+    df["frequency_Hz"] = unit_conversion(wl_arr, unit, "Hz")
     df["frequency_error_Hz"] = (
-        _wavelength_to_frequency(wl_arr - np.asarray(bandwidths) / 2.0, wavelength_unit=unit).value
+        unit_conversion(wl_arr - np.asarray(bandwidths) / 2.0, unit, "Hz")
         - df["frequency_Hz"]
     )
     df["flux_mJy"] = flx_list
@@ -74,12 +74,11 @@ def _mag_to_flux_mJy(mag, mag_err=None, zero_point=3631):
         flux_jy_err = None
     return flux_jy, flux_jy_err
 
-def _wavelength_to_frequency(wavelength, wavelength_unit='AA'):
-    wavelength = np.asarray(wavelength)
-    safe_wl = np.where(wavelength == 0, np.nan, wavelength)
-    frequency = (const.c / u.Quantity(safe_wl, wavelength_unit)).to(u.Hz)
-    return frequency
+def unit_conversion(value, input_unit, output_unit):
+    return u.Quantity(value, input_unit).to(output_unit, equivalencies=u.spectral()).value
 
+def mJy_to_erg_cm2_s(flux_mJy, nu_Hz):
+    return flux_mJy * nu_Hz * 1e-26
 
 def mask_data(x_data, y_data, x_data_error=None, y_data_error=None):
     mask_y = np.isfinite(y_data) & (y_data > 0)

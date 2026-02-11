@@ -30,7 +30,7 @@ class Analyzer(Fitter):
             self.y_data_error = None
         
         self.data_type = data_type
-        self.model = model
+        self._model = model
 
         self.set_params(param_bounds, prior)
         
@@ -39,14 +39,19 @@ class Analyzer(Fitter):
         elif self.data_type == "sed":
             self._x_damper = 0.05
 
-
+    def model(self, x_data, *params):
+        if len(params) == 0:
+            params = self.best_fit_params
+        elif len(params) != len(self.params):
+            raise ValueError(f"Invalid number of parameters: {len(params)} != {len(self.best_fit_params)}")
+        return self._model(x_data, *params)
         
     def set_params(self, param_bounds=None, prior=None):
 
         if param_bounds is None or prior is None:
             from . import prior as prior_module
 
-            default_param_bounds, default_prior = getattr(prior_module, self.model.__name__ + "_prior")(data_type=self.data_type)
+            default_param_bounds, default_prior = getattr(prior_module, self._model.__name__ + "_prior")(data_type=self.data_type)
             self.param_bounds = param_bounds or default_param_bounds
             self.prior = prior or default_prior
         else:

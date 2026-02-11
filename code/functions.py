@@ -1,5 +1,12 @@
 import numpy as np
 
+def pivot_finder(x, y, yerr):
+    weights = 1.0 / (yerr**2)
+    log_pivot = np.average(np.log(x), weights=weights)
+    x_pivot = np.exp(log_pivot)
+    print(f"Optimal Pivot: {x_pivot:.2e}")
+    return x_pivot
+
 def power_law(x, F0, index, x0 = 1):
     return F0 * np.power(x / x0, -index)
 

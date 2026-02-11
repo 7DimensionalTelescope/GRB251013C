@@ -10,7 +10,7 @@ def power_law_prior(data_type="lightcurve", **kwargs):
             "F_pl": (1e-2, 1e3),
             "beta": (0, 3),
         }
-        default_prior = {"log10_F_pl": "log_uniform", "beta": "uniform"}
+        default_prior = {"F_pl": "log_uniform", "beta": "uniform"}
     else:
         raise ValueError(f"Invalid data type: {data_type}")
     
