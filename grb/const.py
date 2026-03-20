@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from astropy.cosmology import Planck18 as cosmo
 
 load_dotenv()
 
@@ -16,6 +17,11 @@ SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
 RA = float(os.getenv("ra"))
 DEC = float(os.getenv("dec"))
 REDSHIFT = float(os.getenv("redshift"))
+
+AV = float(os.getenv("AV", None))
+
+D_L = cosmo.luminosity_distance(REDSHIFT).to("cm").value
+
 TRIGGER_TIME_STR = str(os.getenv("trigger_time"))
 TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S UTC")
 
@@ -127,6 +133,18 @@ FILTER_INFO = {
         "bandwidth_nm": 0,
     },
     "w": {
+        "system": "instrumental",
+        "vega_zero_point_jy": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
+    },
+    "Blue": {  
+        "system": "instrumental",
+        "vega_zero_point_jy": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
+    },
+    "Red": {
         "system": "instrumental",
         "vega_zero_point_jy": None,
         "central_wavelength_nm": 0,

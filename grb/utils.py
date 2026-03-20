@@ -20,51 +20,18 @@ def mag_to_flux_mJy(df):
             f, fe = _mag_to_flux_mJy(m, e)
             flx_list.append(f)
             flx_err_list.append(fe)
-    elif "Filter" in df.columns:
-        wavelengths, bandwidths, flx_list, flx_err_list = [], [], [], []
-        unit = "nm"
-        for m, e, filt in zip(mag, mag_err, df["Filter"]):
-            f, fe, wl, bw = _flux_from_filter(m, e, filt)
-            flx_list.append(f)
-            flx_err_list.append(fe)
-            wavelengths.append(wl)
-            bandwidths.append(bw)
     else:
-        raise ValueError("Wavelength or Filter column not found")
+        raise ValueError("wavelength column not found")
 
     wl_arr = np.asarray(wavelengths)
     df["frequency_Hz"] = unit_conversion(wl_arr, unit, "Hz")
-    df["frequency_error_Hz"] = (
+    df["frequency_Hz_error"] = (
         unit_conversion(wl_arr - np.asarray(bandwidths) / 2.0, unit, "Hz")
         - df["frequency_Hz"]
     )
     df["flux_mJy"] = flx_list
-    df["flux_error_mJy"] = flx_err_list 
+    df["flux_mJy_error"] = flx_err_list 
     return df
-
-def _flux_from_filter(mag, mag_err, filter_name):
-    """Return (flux_jy, flux_err_jy, wavelength_nm, bandwidth_nm) from filter name."""
-    if filter_name in FILTER_INFO:
-        info = FILTER_INFO[filter_name]
-        wl, bw = info["central_wavelength_nm"], info["bandwidth_nm"]
-        if info["system"] == "AB":
-            zero_point = 3631
-        elif info["system"] == "Vega":
-            zero_point = info["vega_zero_point_jy"]
-        elif info["system"] == "instrumental":
-            return None, None, wl, bw
-        else:
-            return None, None, wl, bw
-            
-        flx, flx_err = _mag_to_flux_mJy(mag, mag_err, zero_point=zero_point)
-        
-        return flx, flx_err, wl, bw
-    if isinstance(filter_name, str) and filter_name.startswith("m"):
-        wl = float(filter_name.replace("m", ""))
-        
-        flx, flx_err = _mag_to_flux_mJy(mag, mag_err)
-        return flx, flx_err, wl, 250.0
-    return None, None, np.nan, np.nan
 
 def _mag_to_flux_mJy(mag, mag_err=None, zero_point=3631):
     flux_jy = zero_point*10**(-0.4 * mag) * 1e3
@@ -80,6 +47,9 @@ def unit_conversion(value, input_unit, output_unit):
 def mJy_to_erg_cm2_s(flux_mJy, nu_Hz):
     return flux_mJy * nu_Hz * 1e-26
 
+def mJy_to_erg_cm2_s_Hz(flux_mJy):
+    return flux_mJy * 1e-26
+
 def mask_data(x_data, y_data, x_data_error=None, y_data_error=None):
     mask_y = np.isfinite(y_data) & (y_data > 0)
     mask_x = np.isfinite(x_data) & (x_data > 0)
@@ -93,3 +63,38 @@ def mask_data(x_data, y_data, x_data_error=None, y_data_error=None):
         mask_y_error = True
     mask = mask_y & mask_x & mask_x_error & mask_y_error
     return mask
+
+def filter_to_wavelength(filter_name):
+    if isinstance(filter_name, str):
+        if filter_name in FILTER_INFO:
+            return FILTER_INFO[filter_name]["central_wavelength_nm"] * 10 # in AA
+        elif isinstance(filter_name, str) and filter_name.startswith("m"):
+            return float(filter_name.replace("m", ""))
+        else:
+            print(f"Invalid filter name: {filter_name}")
+            return 0
+            
+    elif isinstance(filter_name, list):
+        return [filter_to_wavelength(filt) for filt in filter_name]
+    elif isinstance(filter_name, pd.Series):
+        return [filter_to_wavelength(filt) for filt in filter_name.to_list()]
+    else:
+        print(f"Invalid input type: {type(filter_name)}")
+        return 0
+
+def filter_width(filter_name):
+    if isinstance(filter_name, str):
+        if filter_name in FILTER_INFO:
+            return FILTER_INFO[filter_name]["bandwidth_nm"] * 10 # in AA
+        elif isinstance(filter_name, str) and filter_name.startswith("m"):
+            return 250
+        else:
+            print(f"Invalid filter name: {filter_name}")
+            return 0
+    elif isinstance(filter_name, list):
+        return [filter_width(filt) for filt in filter_name]
+    elif isinstance(filter_name, pd.Series):
+        return [filter_width(filt) for filt in filter_name.to_list()]
+    else:
+        print(f"Invalid input type: {type(filter_name)}")
+        return 0

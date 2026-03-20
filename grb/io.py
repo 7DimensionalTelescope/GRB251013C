@@ -1,5 +1,8 @@
 import copy
 import pandas as pd
+import warnings
+
+warnings.simplefilter("ignore", RuntimeWarning)
 
 def read_data(filename, correct_galactic_extinction=False, add_converted_flux=False, **kwargs):
     if filename == "circular":
@@ -12,7 +15,7 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
         kwargs = {
             "sep": "\t",
             "header": None,
-            "names": ["Time", "Time_high", "Time_low", "Flux", "Flux_high", "Flux_low"]
+            "names": ["time", "time_high", "time_low", "flux", "flux_high", "flux_low"]
         }
     elif filename == "xrt_index":
         from .const import XRT_INDEX_DATA_FILENAME
@@ -20,7 +23,7 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
         kwargs = {
             "sep": ",",
             "header": None,
-            "names": ["Time", "Time_high", "Time_low", "Index", "Index_high", "Index_low"]
+            "names": ["time", "time_high", "time_low", "index", "index_high", "index_low"]
         }
     elif filename == "sdt":
         from .const import SDT_DATA_FILENAME
@@ -36,6 +39,11 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
     else:
         raise ValueError(f"Unsupported file extension: {filename}")
     
+    if "filter" in df.columns and "wavelength" not in df.columns:
+        from .utils import filter_to_wavelength, filter_width
+        df["wavelength"] = filter_to_wavelength(df["filter"])
+        df["filter_width"] = filter_width(df["filter"])
+
     if correct_galactic_extinction:
         from .extinction import correct_galactic_extinction
         df = correct_galactic_extinction(df)
@@ -50,21 +58,21 @@ def filter_data(df, filter_name=None, facility_name = None, exclude_time_range=N
     filtered_df = copy.deepcopy(df)
     if filter_name is not None:
         if isinstance(filter_name, list):
-            filtered_df = filtered_df[filtered_df["Filter"].isin(filter_name)]
+            filtered_df = filtered_df[filtered_df["filter"].isin(filter_name)]
         else:
-            filtered_df = filtered_df[filtered_df["Filter"] == filter_name]
+            filtered_df = filtered_df[filtered_df["filter"] == filter_name]
     
     if facility_name is not None:
         if isinstance(facility_name, list):
-            filtered_df = filtered_df[filtered_df["Facility"].isin(facility_name)]
+            filtered_df = filtered_df[filtered_df["facility"].isin(facility_name)]
         else:
-            filtered_df = filtered_df[filtered_df["Facility"] == facility_name]
+            filtered_df = filtered_df[filtered_df["facility"] == facility_name]
 
     if exclude_time_range is not None:
-        filtered_df = filtered_df[~filtered_df["Time"].between(exclude_time_range[0], exclude_time_range[1])]
+        filtered_df = filtered_df[~filtered_df["time"].between(exclude_time_range[0], exclude_time_range[1])]
 
     if remove_upper_limits:
-        upper_limits = filtered_df["Limit"]
+        upper_limits = filtered_df["upper_limit"]
         filtered_df = filtered_df[~upper_limits]
 
     return filtered_df

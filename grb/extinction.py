@@ -12,7 +12,9 @@ from dustmaps.sfd import SFDQuery
 import pandas as pd
 import copy
 
-def correct_galactic_extinction(df, magnitude_column="magnitude", wavelength_column="wavelength", **kwargs):
+from .utils import filter_to_wavelength
+
+def correct_galactic_extinction(df, magnitude_column="magnitude", **kwargs):
     
     if "gal_corrected" in df.columns and df["corrected"].all():
         print("Extinction already corrected")
@@ -25,13 +27,19 @@ def correct_galactic_extinction(df, magnitude_column="magnitude", wavelength_col
         uncorrected_df = copy.deepcopy(df)
         corrected_df = pd.DataFrame()
 
-    extinc = galactic_extinction(uncorrected_df[wavelength_column], **kwargs)
+    if "wavelength" in uncorrected_df.columns:
+        wavelength = uncorrected_df["wavelength"]
+        wavelength_unit = "AA"
+    else:
+        raise ValueError("wavelength column not found")
+
+    extinc = galactic_extinction(wavelength, wavelength_unit=wavelength_unit, **kwargs)
     uncorrected_df[magnitude_column] -= extinc
     uncorrected_df["gal_extinction"] = extinc
     uncorrected_df["gal_corrected"] = True
     return pd.concat([corrected_df, uncorrected_df])
 
-def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99",wavelength_unit='AA', rv=3.1):
+def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99", wavelength_unit='AA', rv=3.1):
 
     if (ra is not None) and (dec is not None):
         coords = SkyCoord(ra=ra, dec=dec, unit='deg', frame='icrs')
@@ -43,7 +51,7 @@ def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99",wav
     ebv = sfd(coords)
     
     av = rv * ebv
-    
+
     wavelengths_aa = u.Quantity(wavelength, wavelength_unit).to(u.AA).value
 
     if model == "fitzpatrick99":
@@ -53,7 +61,33 @@ def galactic_extinction(wavelength, ra=None, dec=None, model="fitzpatrick99",wav
 
     return extinc
 
-def host_galaxy_extinction_curve(nu_obs, z=None, model="MW", wavelength_unit='AA'):
+def correct_host_galaxy_extinction(df, Av, flux_column="flux_mJy", **kwargs):
+    if "host_corrected" in df.columns and df["host_corrected"].all():
+        print("Host galaxy extinction already corrected")
+        return df
+    elif "host_corrected" in df.columns and df["host_corrected"].any():
+        print("Host galaxy extinction partially corrected")
+        uncorrected_df = df[~df["host_corrected"]]
+        corrected_df = df[df["host_corrected"]]
+    else:
+        uncorrected_df = copy.deepcopy(df)
+        corrected_df = pd.DataFrame()
+
+    if "frequency_Hz" not in uncorrected_df.columns:
+        raise ValueError("frequency_Hz column not found")
+    if "flux_mJy" not in uncorrected_df.columns:
+        raise ValueError("flux_mJy column not found")
+    if "flux_mJy_error" not in uncorrected_df.columns:
+        raise ValueError("flux_mJy_error column not found")
+
+    extinc = host_galaxy_extinction(df["frequency_Hz"], Av, **kwargs)
+    uncorrected_df[flux_column] /= extinc
+    uncorrected_df[f"{flux_column}_error"] /= extinc
+    uncorrected_df["host_extinction"] = -2.5*np.log10(extinc)
+    uncorrected_df["host_corrected"] = True
+    return pd.concat([corrected_df, uncorrected_df])
+
+def host_galaxy_extinction_curve(nu_obs, z=None, model="MW"):
 
     if z is None:
         from .const import REDSHIFT
@@ -80,3 +114,5 @@ def host_galaxy_extinction(nu_obs, Av, eta=None, **kwargs):
         eta = host_galaxy_extinction_curve(nu_obs, **kwargs)
 
     return np.exp(-eta * Av / 1.086)
+
+
