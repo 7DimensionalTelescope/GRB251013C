@@ -4,6 +4,24 @@ import scipy
 import datetime
 import re
 
+class _BilbyFitterLikelihood:
+    """bilby.Likelihood-compatible wrapper around Fitter.log_likelihood."""
+
+    def __new__(cls, fitter, bilby_module, param_names, rescale=True):
+        class BilbyLikelihood(bilby_module.Likelihood):
+            def __init__(self):
+                # Keep a parameter dict for bilby v2 compatibility while also
+                # accepting explicit parameters for newer interfaces.
+                super().__init__(parameters={name: None for name in param_names})
+
+            def log_likelihood(self, parameters=None):
+                if parameters is None:
+                    parameters = self.parameters
+                params = [parameters[name] for name in param_names]
+                return fitter.log_likelihood(params, rescale=rescale)
+
+        return BilbyLikelihood()
+
 class Fitter:
     def __init__(self):
         self.fit_statistic = "chisq"
@@ -312,8 +330,9 @@ class Fitter:
     def _build_bilby_priors(self):
         import bilby
 
+        param_names = getattr(self, "params", list(self.param_bounds.keys()))
         priors = bilby.core.prior.PriorDict()
-        for name in self.params:
+        for name in param_names:
             bounds = self.param_bounds[name]
             prior_type = self.prior[name]
 
@@ -327,6 +346,7 @@ class Fitter:
                 # Existing convention in this project: log10(param) ~ Normal(mean, std).
                 # bilby LogNormal is defined in natural-log space.
                 ln10 = np.log(10.0)
+                
                 priors[name] = bilby.core.prior.LogNormal(
                     mu=bounds[0] * ln10,
                     sigma=bounds[1] * ln10,
@@ -337,25 +357,42 @@ class Fitter:
 
         return priors
 
-    def _run_bilby(self, sampler="dynesty", label="grb_fit", outdir="bilby_out", **kwargs):
+    # def _build_bilby_likelihood(self):
+        # class BilbyLikelihood(bilby.Likelihood):
+        #     def __init__(self, x_data, y_data, y_data_error):
+        #         super().__init__(parameters=self.param_bounds.keys())
+
+        #     def log_likelihood(self):
+        #         return self.log_likelihood(self.params)
+
+
+    def _run_bilby(self, sampler="dynesty", label="grb_fit", outdir="bilby_out", rescale=True, nlive=800, dlogz=0.2, walks=20, resume=True, **kwargs):
         import bilby
 
         if self.y_data_error is None:
             raise ValueError("bilby requires y_data_error for GaussianLikelihood")
 
+        param_names = getattr(self, "params", list(self.param_bounds.keys()))
         priors = self._build_bilby_priors()
+        likelihood = _BilbyFitterLikelihood(self, bilby, param_names, rescale=rescale)
 
         self.sampler = bilby.run_sampler(
-            likelihood=self.log_likelihood,
+            likelihood=likelihood,
             priors=priors,
             sampler=sampler,
             label=label,
             outdir=outdir,
+            maxiter=None,
+            maxcall=None,
+            nlive = nlive,
+            dlogz=dlogz,
+            walks=walks,
+            resume=resume,
             **kwargs,
         )
 
         posterior = self.sampler.posterior
-        samples = posterior[self.params].to_numpy()
+        samples = posterior[param_names].to_numpy()
 
         if "log_likelihood" in posterior.columns:
             log_like = posterior["log_likelihood"].to_numpy()
@@ -365,11 +402,19 @@ class Fitter:
             best_idx = int(np.argmax(self.sampler.log_likelihood_evaluations))
             best_log_like = float(self.sampler.log_likelihood_evaluations[best_idx])
 
+        # bilby posterior samples are already posterior-distributed, so
+        # represent them as equally weighted samples in the UltraNest-like schema.
+        nsamples = len(samples)
+        if nsamples > 0:
+            weights = np.full(nsamples, 1.0 / nsamples)
+        else:
+            weights = np.array([])
+
         self.results = {
             "samples": samples,
             "maximum_likelihood": {"point": samples[best_idx], "log_prob": best_log_like},
-            "weighted_samples": {"points": samples},
-            "paramnames": self.params,
+            "weighted_samples": {"points": samples, "weights": weights},
+            "paramnames": param_names,
         }
         return self.sampler
 
