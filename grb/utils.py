@@ -51,6 +51,8 @@ def _flux_from_filter(mag, mag_err, filter_name):
             zero_point = 3631
         elif info["system"] == "Vega":
             zero_point = info["vega_zero_point_jy"]
+        elif info["system"] == "Swift":
+            zero_point = info["uvot_zero_point_jy"]
         elif info["system"] == "instrumental":
             return None, None, wl, bw
         else:
@@ -67,12 +69,12 @@ def _flux_from_filter(mag, mag_err, filter_name):
     return None, None, np.nan, np.nan
 
 def _mag_to_flux_mJy(mag, mag_err=None, zero_point=3631):
-    flux_jy = zero_point*10**(-0.4 * mag) * 1e3
+    flux_mjy = zero_point*10**(-0.4 * mag) * 1e3
     if mag_err is not None:
-        flux_jy_err = flux_jy * (np.log(10) * 0.4) * mag_err
+        flux_mjy_err = flux_mjy * (np.log(10) * 0.4) * mag_err
     else:
-        flux_jy_err = None
-    return flux_jy, flux_jy_err
+        flux_mjy_err = None
+    return flux_mjy, flux_mjy_err
 
 def unit_conversion(value, input_unit, output_unit):
     return u.Quantity(value, input_unit).to(output_unit, equivalencies=u.spectral()).value

@@ -1,7 +1,7 @@
 import copy
 import pandas as pd
 
-def read_data(filename, correct_galactic_extinction=False, add_converted_flux=False, **kwargs):
+def read_data(filename, correct_galactic_extinction=False, correct_host_extinction=False, host_av=0.0, host_z=0.0, add_converted_flux=False, **kwargs) -> pd.DataFrame:
     if filename == "circular":
         from .const import CIRCULAR_DATA_FILENAME
         filename = CIRCULAR_DATA_FILENAME
@@ -22,13 +22,36 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
             "header": None,
             "names": ["Time", "Time_high", "Time_low", "Index", "Index_high", "Index_low"]
         }
+    elif filename == "xrt_unabsorb":
+        from .const import XRT_UNABSORB_DATA_FILENAME
+        filename = XRT_UNABSORB_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+        }
     elif filename == "sdt":
         from .const import SDT_DATA_FILENAME
         filename = SDT_DATA_FILENAME
         kwargs = {
             "sep": ",",
         }
-        
+    elif filename == "sdt_pivot":
+        from .const import SDT_PIVOT_DATA_FILENAME
+        filename = SDT_PIVOT_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+        }
+    elif filename == "sdt_tractor":
+        from .const import SDT_TRACER_DATA_FILENAME
+        filename = SDT_TRACER_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+        }
+    elif filename == "circular_wavelength":
+        from .const import CIRCULAR_WAVELENGTH_DATA_FILENAME
+        filename = CIRCULAR_WAVELENGTH_DATA_FILENAME
+        kwargs = {
+            "sep": ",",
+        }
     if filename.endswith(".csv"):
         df = pd.read_csv(filename, **kwargs)
     elif filename.endswith(".xlsx"):
@@ -39,7 +62,11 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
     if correct_galactic_extinction:
         from .extinction import correct_galactic_extinction
         df = correct_galactic_extinction(df)
-
+    
+    if correct_host_extinction:
+        from .extinction import correct_host_galaxy_extinction
+        df = correct_host_galaxy_extinction(df, Av=host_av, z=host_z)
+    
     if add_converted_flux:
         from .utils import mag_to_flux_mJy
         df = mag_to_flux_mJy(df)
@@ -47,6 +74,19 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
     return df
 
 def filter_data(df, filter_name=None, facility_name = None, exclude_time_range=None, remove_upper_limits=False):
+    """
+    Filter data by filter name, facility name, exclude time range, and remove upper limits
+    
+    Args:
+        df: DataFrame to filter
+        filter_name: Filter name to filter by
+        facility_name: Facility name to filter by
+        exclude_time_range: Time range to exclude
+        remove_upper_limits: Remove upper limits
+    
+    Returns:
+        Filtered DataFrame
+    """
     filtered_df = copy.deepcopy(df)
     if filter_name is not None:
         if isinstance(filter_name, list):
