@@ -14,3 +14,4 @@ extinction==0.4.8
 jupyter==1.1.1
 VegasAfterglow==1.1.0
 VegasAfterglow[mcmc]
+openpyxl==3.1.5

@@ -56,7 +56,7 @@ if __name__ == "__main__":
         updated_error.append(error)
         updated_name.append(name)
         updated_time.append(time)
-        updated_t_diff.append((time - TRIGGER_TIME).total_seconds() / 3600.0)
+        updated_t_diff.append((time - TRIGGER_TIME).total_seconds())
         
     df["Starting Date"] = updated_time
     df["T-T0"] = updated_t_diff
@@ -67,8 +67,8 @@ if __name__ == "__main__":
     df["T-T0"] = updated_t_diff
     df["T-T0"] = df["T-T0"].round(2)
 
-    df.rename(columns={"T-T0": "Time"}, inplace=True)
+    df.rename(columns={"T-T0": "time", "Starting Date": "date_obs", "Facility": "facility", "Mag": "magnitude", "Error": "mag_error", "Limit": "upper_limit", "Filter": "filter", "Exposure": "exposure"}, inplace=True)
     
-    df.sort_values(by="Starting Date", inplace=True)
+    df.sort_values(by="date_obs", inplace=True)
     
     df.to_excel(f"{DATA_DIR}/circular.xlsx", index=False)

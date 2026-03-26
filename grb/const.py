@@ -4,6 +4,7 @@ Constants for GRB fitting
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from astropy.cosmology import Planck18 as cosmo
 
 load_dotenv()
 
@@ -23,6 +24,11 @@ CIRCULAR_WAVELENGTH_DATA_FILENAME = os.path.join(DATA_DIR, "circular_wavelength.
 RA = float(os.getenv("ra"))
 DEC = float(os.getenv("dec"))
 REDSHIFT = float(os.getenv("redshift"))
+
+AV = float(os.getenv("AV", None))
+
+D_L = cosmo.luminosity_distance(REDSHIFT).to("cm").value
+
 TRIGGER_TIME_STR = str(os.getenv("trigger_time"))
 TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S UTC")
 AV = float(os.getenv("av", 0))
@@ -409,6 +415,18 @@ FILTER_INFO = {
         "vega_zero_point_jy": None,
         "central_wavelength_nm": 8729,
         "bandwidth_nm": 250,
+    },
+    "Blue": {  
+        "system": "instrumental",
+        "vega_zero_point_jy": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
+    },
+    "Red": {
+        "system": "instrumental",
+        "vega_zero_point_jy": None,
+        "central_wavelength_nm": 0,
+        "bandwidth_nm": 0,
     },
 }
 
