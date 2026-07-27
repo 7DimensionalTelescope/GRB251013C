@@ -17,56 +17,40 @@ from grb.io import read_data
 from grb.const import D_L, REDSHIFT
 from grb.extinction import host_extinction_attenuation
 from grb.plotting import set_log_y_limits
-from grb.results import latest_result_dir
+from grb.results import latest_result_dir, read_labels
+from grb.results import load_best_fit_params as grb_load_best_fit_params
 from grb.spectral_index import load_xrt_spectral_index
 
 PROJECT_DIR = Path(__file__).absolute().parent
 FIT_RESULTS_DIR = PROJECT_DIR / "fit_results"
 
 
-def load_best_fit_params(outdir, make_param_defs_func):
+def load_best_fit_params(outdir):
     """Load best-fit parameters from saved results
-    
-    Args:
-        outdir: Path to results directory
-        make_param_defs_func: Function to create parameter definitions
+
+    Wraps grb.results.load_best_fit_params, adding the two extras this module's
+    plots need (labels, best_sample) and recognising the legacy "t_peak" flare
+    label that predates "t_start_flare".
     """
     outdir = Path(outdir)
-    
-    # Load samples and labels
-    samples = np.load(outdir / "samples.npy")
+
+    params, include_flare, include_wing = grb_load_best_fit_params(outdir)
+
+    labels = read_labels(outdir / "labels.txt")
     log_probs = np.load(outdir / "log_probs.npy")
-    labels = [l.strip() for l in (outdir / "labels.txt").read_text().strip().split("\n") if l.strip()]
-    
-    # Get best-fit sample
-    best_idx = np.argmax(log_probs)
-    best_sample = samples[best_idx]
-    
-    # Determine model type - check for both old and new flare parameter names
-    include_flare = any(("t_peak" in label or "t_start_flare" in label) for label in labels)
-    include_wing = any("E_iso_wing" in label for label in labels)
-    
-    # Convert to physical parameters using LABELS (not param_defs order)
-    # This way we always match the saved parameter order
-    params = {}
-    for label, value in zip(labels, best_sample):
-        # Extract parameter name from label (remove log10_ prefix if present)
-        if label.startswith("log10_"):
-            param_name = label.replace("log10_", "")
-            params[param_name] = 10 ** value  # Convert from log space
-        else:
-            param_name = label
-            params[param_name] = value  # Linear space
+    best_sample = np.load(outdir / "samples.npy")[np.argmax(log_probs)]
+
+    # Older runs of this phase named the flare start "t_peak"
+    include_flare = include_flare or any("t_peak" in label for label in labels)
     
     return params, include_flare, include_wing, labels, best_sample
 
 
-def plot_light_curves(outdir, make_param_defs_func, compute_model_components_func, xrt_band, i_band_freq):
+def plot_light_curves(outdir, compute_model_components_func, xrt_band, i_band_freq):
     """Generate best-fit light curve plots
     
     Args:
         outdir: Path to results directory
-        make_param_defs_func: Function to create parameter definitions
         compute_model_components_func: Function to compute model flux components
         xrt_band: XRT energy band (tuple of min, max keV)
         i_band_freq: i-band frequency in Hz
@@ -78,7 +62,7 @@ def plot_light_curves(outdir, make_param_defs_func, compute_model_components_fun
     i_data = read_data("i_data", correct_galactic_extinction=True, add_converted_flux=True)
     
     # Load best-fit parameters
-    params, include_flare, include_wing, labels, best_sample = load_best_fit_params(outdir, make_param_defs_func)
+    params, include_flare, include_wing, labels, best_sample = load_best_fit_params(outdir)
     
     print(f"Plotting light curves for: {outdir.name}")
     print(f"  Model: Core{' + Flare' if include_flare else ''}{' + Wing' if include_wing else ''}")
@@ -199,17 +183,16 @@ def plot_light_curves(outdir, make_param_defs_func, compute_model_components_fun
     plt.close()
 
 
-def plot_spectral_index(outdir, make_param_defs_func):
+def plot_spectral_index(outdir):
     """Generate spectral index comparison plot
     
     Args:
         outdir: Path to results directory
-        make_param_defs_func: Function to create parameter definitions
     """
     outdir = Path(outdir)
     
     # Load best-fit parameters
-    params, include_flare, include_wing, labels, best_sample = load_best_fit_params(outdir, make_param_defs_func)
+    params, include_flare, include_wing, labels, best_sample = load_best_fit_params(outdir)
     
     print(f"Plotting spectral index comparison...")
     
@@ -287,8 +270,8 @@ def main():
     print(f"Results directory: {outdir}\n")
     
     # Generate plots
-    plot_light_curves(outdir, make_param_defs, compute_model_components, XRT_BAND, I_BAND_FREQ)
-    plot_spectral_index(outdir, make_param_defs)
+    plot_light_curves(outdir, compute_model_components, XRT_BAND, I_BAND_FREQ)
+    plot_spectral_index(outdir)
     
     print(f"\n{'=' * 60}")
     print("✓ All plots generated successfully!")

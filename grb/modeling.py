@@ -100,15 +100,20 @@ def make_core_model(params):
                  resolutions=MODEL_RESOLUTIONS)
 
 
-def make_wing_model(params):
-    """Wing jet (no reverse shock, with spreading for late-time emission)"""
+def make_wing_model(params, spreading=True):
+    """Wing jet (no reverse shock).
+
+    spreading=True (default) enables lateral spreading to maintain flux at late
+    times, which is what the final model wants. partial_data.py fits the wing
+    without a jet break and passes spreading=False.
+    """
     observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
     medium = ISM(n_ism=params["n_ism"])
     jet = TophatJet(
         E_iso=params["E_iso_wing"],
         Gamma0=params["Gamma0_wing"],
         theta_c=params["theta_c_wing"],
-        spreading=True,  # Enable spreading to maintain flux at late times
+        spreading=spreading,
         duration=params.get("tau", 10.0),
     )
     radiation = Radiation(

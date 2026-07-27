@@ -12,14 +12,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import emcee
 
-from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet, ParamDef, Scale
+from VegasAfterglow import ParamDef, Scale
 from VegasAfterglow.units import keV
 
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from grb.const import D_L, HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, TRIGGER_TIME
+from grb.const import HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, TRIGGER_TIME
 from grb.io import read_data
 from grb.extinction import host_extinction_attenuation
+from grb.functions import norris_flare
+from grb.likelihood import log_prior
+from grb.modeling import make_core_model, make_wing_model
 from grb.params import ParamDefWithPrior
 from grb.plotting import plot_corner
 from grb.results import top_k_samples
@@ -32,104 +35,9 @@ FIT_RESULTS_DIR = PROJECT_DIR / "fit_results"
 XRT_BAND = (0.3 * keV, 10.0 * keV)  # 0.3-10 keV in Hz units
 I_BAND_FREQ = 3.931704e14  # Hz - actual i-band frequency from data (763 nm)
 FLUX_CONVERSION_FACTOR = 1e26  # erg/s/cm²/Hz to mJy (1 mJy = 1e-26 erg/s/cm²/Hz)
-MODEL_RESOLUTIONS = (0.1, 0.25, 10)  # VegasAfterglow resolution parameters
 
 # Flare time range
 FLARE_TIME_RANGE = (3000, 10000)  # seconds
-
-
-def norris_flare(t, t_start, tau_rise, tau_decay, amplitude):
-    """
-    Norris function for GRB flare profile
-    Fast rise + exponential decay (very asymmetric)
-    
-    F(t) = A * exp(-tau_rise/(t-t_start) - (t-t_start)/tau_decay) for t > t_start
-    
-    Args:
-        t: time array
-        t_start: flare start time
-        tau_rise: rise timescale (smaller = faster rise)
-        tau_decay: decay timescale (larger = slower decay)
-        amplitude: peak amplitude
-    
-    Returns:
-        Flux array with Norris profile
-    """
-    flux = np.zeros_like(t, dtype=float)
-    mask = t > t_start
-    
-    if np.any(mask):
-        dt = t[mask] - t_start
-        # Norris function: combines rising and decaying exponentials
-        with np.errstate(over='ignore', divide='ignore', invalid='ignore'):
-            flux[mask] = amplitude * np.exp(-tau_rise / dt - dt / tau_decay)
-        
-        # Clean up any inf/nan values
-        flux[~np.isfinite(flux)] = 0.0
-    
-    return flux
-
-
-def make_core_model(params):
-    """Create narrow core jet model with jet break and reverse shock"""
-    observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
-    jet = TophatJet(
-        E_iso=params["E_iso_core"],
-        Gamma0=params["Gamma0_core"],
-        theta_c=params["theta_c_core"],
-        spreading=True,  # Jet break enabled
-        duration=params.get("tau", 10.0),
-    )
-    fwd_radiation = Radiation(
-        eps_e=params["eps_e"],
-        eps_B=params["eps_B"],
-        p=params["p"],
-        xi_e=params["xi"],
-        ssc=False,
-        kn=False,
-    )
-    
-    # Reverse shock radiation (if parameters are provided)
-    rvs_radiation = None
-    if "p_r" in params and "eps_e_r" in params and "eps_B_r" in params:
-        rvs_radiation = Radiation(
-            eps_e=params["eps_e_r"],
-            eps_B=params["eps_B_r"],
-            p=params["p_r"],
-            xi_e=params.get("xi_r", params["xi"]),  # Fall back to forward shock xi if not provided
-            ssc=False,
-            kn=False,
-        )
-    
-    return Model(jet=jet, medium=medium, observer=observer, fwd_rad=fwd_radiation, rvs_rad=rvs_radiation, resolutions=MODEL_RESOLUTIONS)
-
-
-def make_wing_model(params):
-    """Create wide wing jet model
-    
-    Uses wing-specific microphysics if available (p_wing, eps_e_wing, etc.),
-    otherwise falls back to core parameters (p, eps_e, etc.)
-    """
-    observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
-    jet = TophatJet(
-        E_iso=params["E_iso_wing"],
-        Gamma0=params["Gamma0_wing"],
-        theta_c=params["theta_c_wing"],
-        spreading=False,  # No jet break for wing
-        duration=params.get("tau", 10.0),
-    )
-    # Use wing-specific microphysics if available, otherwise use core values
-    radiation = Radiation(
-        eps_e=params.get("eps_e_wing", params["eps_e"]),
-        eps_B=params.get("eps_B_wing", params["eps_B"]),
-        p=params.get("p_wing", params["p"]),
-        xi_e=params.get("xi_wing", params["xi"]),
-        ssc=False,
-        kn=False,
-    )
-    return Model(jet=jet, medium=medium, observer=observer, fwd_rad=radiation, resolutions=MODEL_RESOLUTIONS)
 
 
 def make_param_defs(include_flare=True, include_wing=True):
@@ -291,7 +199,7 @@ def compute_model_components(t_array, nu, params, include_flare=True, include_wi
     
     # Wing contribution  
     if include_wing and "E_iso_wing" in params:
-        wing_model = make_wing_model(params)
+        wing_model = make_wing_model(params, spreading=False)
         if hasattr(nu, '__len__'):
             wing_flux = np.asarray(wing_model.flux(t_array, nu[0], nu[1], 10).total)
         else:
@@ -388,30 +296,6 @@ def log_likelihood(theta, param_defs, xrt_data, i_data, include_flare, include_w
         
     except (ValueError, RuntimeError, ZeroDivisionError) as e:
         return -np.inf
-
-
-def log_prior(theta, param_defs):
-    """Compute log prior"""
-    log_prob = 0.0
-    
-    for param_def, value in zip(param_defs, theta):
-        # Check bounds
-        if param_def.scale is Scale.LOG:
-            sampled_lower = np.log10(param_def.lower)
-            sampled_upper = np.log10(param_def.upper)
-        else:
-            sampled_lower = param_def.lower
-            sampled_upper = param_def.upper
-        
-        if not (sampled_lower <= value <= sampled_upper):
-            return -np.inf
-        
-        # Gaussian priors
-        if isinstance(param_def, ParamDefWithPrior) and param_def.has_gaussian_prior():
-            mean, sigma = param_def.get_prior_mean_sigma()
-            log_prob += -0.5 * ((value - mean) / sigma) ** 2
-    
-    return log_prob
 
 
 def log_probability(theta, param_defs, xrt_data, i_data, include_flare, include_wing):
@@ -609,8 +493,8 @@ def main():
     
     try:
         from partial_data_plotting import plot_light_curves, plot_spectral_index
-        plot_light_curves(outdir, make_param_defs, compute_model_components, XRT_BAND, I_BAND_FREQ)
-        plot_spectral_index(outdir, make_param_defs)
+        plot_light_curves(outdir, compute_model_components, XRT_BAND, I_BAND_FREQ)
+        plot_spectral_index(outdir)
     except Exception as e:
         print(f"Warning: Could not generate plots: {e}")
         import traceback
