@@ -9,17 +9,11 @@ from VegasAfterglow.units import mJy
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from grb.io import read_data
-from grb.const import REDSHIFT
-from utils import (
-    XRT_EXCLUDE_TIME_RANGE,
-    compute_break_frequencies,
-    host_extinction_attenuation,
-    latest_result_dir,
-    load_xrt_spectral_index,
-    plot_corner,
-    read_labels,
-    set_log_y_limits,
-)
+from grb.const import REDSHIFT, XRT_EXCLUDE_TIME_RANGE
+from grb.extinction import host_extinction_attenuation
+from grb.plotting import plot_corner, set_log_y_limits
+from grb.results import latest_result_dir, read_labels
+from grb.spectral_index import compute_break_frequencies, load_xrt_spectral_index
 from spectral_index_interpolator import get_spectral_index_calculator
 
 
@@ -40,7 +34,7 @@ def plot_best_fit(
     make_core_model,
     to_physical,
     xrt_band,
-    xrt_flux_error,
+    flux_error,
 ):
     outdir = Path(outdir)
     params = to_physical(theta, param_defs)
@@ -61,7 +55,7 @@ def plot_best_fit(
     ax_opt = fig.add_subplot(gs[1])
     ax_sed = fig.add_subplot(gs[2])
 
-    xrt_err = xrt_flux_error(xrt_data)
+    xrt_err = flux_error(xrt_data)
     all_xrt_data = read_data("xrt")
     flare_xrt_data = all_xrt_data[all_xrt_data["time"].between(*XRT_EXCLUDE_TIME_RANGE)]
     ax_xrt.axvspan(
@@ -75,7 +69,7 @@ def plot_best_fit(
         ax_xrt.errorbar(
             flare_xrt_data["time"] / 3600,
             flare_xrt_data["flux"],
-            yerr=xrt_flux_error(flare_xrt_data),
+            yerr=flux_error(flare_xrt_data),
             fmt=".",
             color="gray",
             alpha=0.6,
@@ -185,8 +179,8 @@ def plot_best_fit(
         ax_xrt,
         xrt_data["flux"].to_numpy(float) - xrt_err,
         xrt_data["flux"].to_numpy(float) + xrt_err,
-        flare_xrt_data["flux"].to_numpy(float) - xrt_flux_error(flare_xrt_data),
-        flare_xrt_data["flux"].to_numpy(float) + xrt_flux_error(flare_xrt_data),
+        flare_xrt_data["flux"].to_numpy(float) - flux_error(flare_xrt_data),
+        flare_xrt_data["flux"].to_numpy(float) + flux_error(flare_xrt_data),
         xrt_fixed + xrt_new_core,
     )
     set_log_y_limits(
@@ -230,7 +224,7 @@ def plot_spectral_index_comparison(best_params, param_labels, outdir, xrt_index_
         try:
             xrt_index_data = load_xrt_spectral_index()
             # Filter to late phase only (after flare)
-            from utils import XRT_FLARE_START_TIME, XRT_FLARE_END_TIME
+            from grb.const import XRT_FLARE_END_TIME, XRT_FLARE_START_TIME
             mask = xrt_index_data["time"] > XRT_FLARE_END_TIME
             xrt_index_data = {k: v[mask] for k, v in xrt_index_data.items()}
         except Exception as e:
@@ -426,7 +420,7 @@ def regenerate_plot(result_dir=None, early_dir=None, corner_samples=20000, skip_
         sampled_labels,
         save_bestfit_params,
         to_physical,
-        xrt_flux_error,
+        flux_error,
     )
 
     result_dir = Path(result_dir) if result_dir else latest_result_dir(FIT_RESULTS_DIR, "late_phase_")
@@ -456,14 +450,14 @@ def regenerate_plot(result_dir=None, early_dir=None, corner_samples=20000, skip_
         make_core_model,
         to_physical,
         XRT_BAND,
-        xrt_flux_error,
+        flux_error,
     )
     save_bestfit_params(result_dir, theta, log_prob, param_defs, early_params, early_dir, xrt_data, optical_data, free_w)
     
     # Generate spectral index comparison plot if data is available
     try:
         xrt_index_data = load_xrt_spectral_index()
-        from utils import XRT_FLARE_END_TIME
+        from grb.const import XRT_FLARE_END_TIME
         mask = xrt_index_data["time"] > XRT_FLARE_END_TIME
         xrt_index_data = {k: v[mask] for k, v in xrt_index_data.items()}
         if len(xrt_index_data.get("time", [])) > 0:

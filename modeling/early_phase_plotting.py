@@ -9,17 +9,11 @@ from VegasAfterglow.units import Hz, mJy, sec
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from grb.io import read_data
-from grb.const import REDSHIFT
-from utils import (
-    XRT_EXCLUDE_TIME_RANGE,
-    compute_break_frequencies,
-    latest_result_dir,
-    load_xrt_spectral_index,
-    model_array,
-    plot_corner,
-    set_log_y_limits,
-    xrt_flux_error,
-)
+from grb.const import REDSHIFT, XRT_EXCLUDE_TIME_RANGE
+from grb.plotting import plot_corner, set_log_y_limits
+from grb.results import latest_result_dir
+from grb.spectral_index import compute_break_frequencies, load_xrt_spectral_index
+from grb.utils import flux_error, model_array
 from spectral_index_interpolator import get_spectral_index_calculator
 
 
@@ -47,7 +41,7 @@ def plot_best_fit(fitter, best_params, xrt_data, i_data, outdir, xrt_band, host_
 
     fig, (ax_xrt, ax_i) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    xrt_err = xrt_flux_error(xrt_data)
+    xrt_err = flux_error(xrt_data)
     all_xrt_data = read_data("xrt")
     flare_xrt_data = all_xrt_data[all_xrt_data["time"].between(*XRT_EXCLUDE_TIME_RANGE)]
     ax_xrt.axvspan(
@@ -61,7 +55,7 @@ def plot_best_fit(fitter, best_params, xrt_data, i_data, outdir, xrt_band, host_
         ax_xrt.errorbar(
             flare_xrt_data["time"] / 3600,
             flare_xrt_data["flux"],
-            yerr=xrt_flux_error(flare_xrt_data),
+            yerr=flux_error(flare_xrt_data),
             fmt="o",
             color="gray",
             alpha=0.6,
@@ -106,8 +100,8 @@ def plot_best_fit(fitter, best_params, xrt_data, i_data, outdir, xrt_band, host_
         ax_xrt,
         xrt_data["flux"].to_numpy(float) - xrt_err,
         xrt_data["flux"].to_numpy(float) + xrt_err,
-        flare_xrt_data["flux"].to_numpy(float) - xrt_flux_error(flare_xrt_data),
-        flare_xrt_data["flux"].to_numpy(float) + xrt_flux_error(flare_xrt_data),
+        flare_xrt_data["flux"].to_numpy(float) - flux_error(flare_xrt_data),
+        flare_xrt_data["flux"].to_numpy(float) + flux_error(flare_xrt_data),
         xrt_model,
     )
     set_log_y_limits(
@@ -140,7 +134,7 @@ def plot_spectral_index_comparison(best_params, param_labels, outdir, xrt_index_
         try:
             xrt_index_data = load_xrt_spectral_index()
             # Filter to early phase only (before flare)
-            from utils import XRT_FLARE_START_TIME
+            from grb.const import XRT_FLARE_START_TIME
             mask = xrt_index_data["time"] < XRT_FLARE_START_TIME
             xrt_index_data = {k: v[mask] for k, v in xrt_index_data.items()}
         except Exception as e:

@@ -17,20 +17,17 @@ from VegasAfterglow.units import Hz, keV, mJy, sec
 
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from grb.const import D_L, REDSHIFT
+from grb.const import D_L, HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, XRT_FLARE_START_TIME
 from grb.io import read_data
 from early_phase_plotting import plot_best_fit, plot_spectral_index_comparison
-from utils import (
-    HOST_AV_LOG10_MEAN,
-    HOST_AV_LOG10_SIGMA,
-    ParamDefWithPrior,
-    XRT_FLARE_START_TIME,
-    compute_p_prior_from_spectral_index,
+from grb.params import ParamDefWithPrior
+from grb.plotting import plot_corner
+from grb.spectral_index import (
     compute_break_frequencies,
+    compute_p_prior_from_spectral_index,
     load_xrt_spectral_index,
-    plot_corner,
-    xrt_flux_error,
 )
+from grb.utils import flux_error
 from spectral_index_interpolator import get_spectral_index_calculator
 
 
@@ -85,7 +82,7 @@ def make_fitter(xrt_data, i_data):
         band=XRT_BAND,
         t=xrt_data["time"].to_numpy(float) * sec,
         flux=xrt_data["flux"].to_numpy(float),
-        err=xrt_flux_error(xrt_data),
+        err=flux_error(xrt_data),
         num_points=10,
     )
 
@@ -325,13 +322,13 @@ def chi2_with_spectral_index(params_array, param_defs, xrt_data, i_data, xrt_ind
     i_model_flux_density = model.flux_density(i_times, i_freqs).total
     
     # Apply host extinction to optical data
-    from utils import host_extinction_attenuation
+    from grb.extinction import host_extinction_attenuation
     attenuation = host_extinction_attenuation(i_freqs, A_V, REDSHIFT)
     i_model_flux_density_attenuated = i_model_flux_density * attenuation
     
     # XRT chi2
     xrt_diff = xrt_data["flux"].to_numpy(float) - xrt_model_flux
-    chi2 = np.sum((xrt_diff / xrt_flux_error(xrt_data)) ** 2)
+    chi2 = np.sum((xrt_diff / flux_error(xrt_data)) ** 2)
     
     # i-band chi2
     i_diff = i_data["flux_mJy"].to_numpy(float) - i_model_flux_density_attenuated / mJy
@@ -507,7 +504,7 @@ def run_custom_emcee(param_defs, xrt_data, i_data, xrt_index_data, spectral_inde
     result.labels = labels
     
     # Get top-k samples
-    from utils import top_k_samples
+    from grb.results import top_k_samples
     result.top_k_params, result.top_k_log_probs = top_k_samples(samples, log_probs, top_k=10)
     
     return result

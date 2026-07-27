@@ -12,10 +12,12 @@ from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet
 from VegasAfterglow.units import keV
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from grb.const import D_L, REDSHIFT
 from grb.io import read_data
-from utils import model_array, host_extinction_attenuation, xrt_flux_error
+from grb.extinction import host_extinction_attenuation
+from grb.utils import flux_error, model_array
 
 # XRT band
 XRT_BAND = (0.3 * keV, 10.0 * keV)
@@ -137,7 +139,7 @@ def main():
     fig, ((ax_xrt, ax_i), (ax_ratio_xrt, ax_ratio_i)) = plt.subplots(2, 2, figsize=(14, 10))
     
     t_grid_hr = t_grid / 3600
-    xrt_err = xrt_flux_error(xrt_data)
+    xrt_err = flux_error(xrt_data)
     
     # XRT panel
     ax_xrt.errorbar(xrt_data['time'] / 3600, xrt_data['flux'], yerr=xrt_err,

@@ -15,12 +15,10 @@ os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from grb.io import read_data
 from grb.const import D_L, REDSHIFT
-from utils import (
-    host_extinction_attenuation,
-    latest_result_dir,
-    load_xrt_spectral_index,
-    set_log_y_limits,
-)
+from grb.extinction import host_extinction_attenuation
+from grb.plotting import set_log_y_limits
+from grb.results import latest_result_dir
+from grb.spectral_index import load_xrt_spectral_index
 
 PROJECT_DIR = Path(__file__).absolute().parent
 FIT_RESULTS_DIR = PROJECT_DIR / "fit_results"

@@ -15,21 +15,13 @@ from VegasAfterglow.units import keV, mJy
 
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from grb.const import D_L, REDSHIFT, TRIGGER_TIME
+from grb.const import D_L, HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, TRIGGER_TIME, XRT_EXCLUDE_TIME_RANGE
 from grb.io import filter_data, read_data
 from late_phase_plotting import plot_best_fit, plot_corner, plot_spectral_index_comparison
-from utils import (
-    HOST_AV_LOG10_MEAN,
-    HOST_AV_LOG10_SIGMA,
-    XRT_EXCLUDE_TIME_RANGE,
-    compute_break_frequencies,
-    default_nwalkers,
-    host_extinction_attenuation,
-    load_xrt_spectral_index,
-    read_labels,
-    top_k_samples,
-    xrt_flux_error,
-)
+from grb.extinction import host_extinction_attenuation
+from grb.results import read_labels, top_k_samples
+from grb.spectral_index import compute_break_frequencies, load_xrt_spectral_index
+from grb.utils import flux_error
 from spectral_index_interpolator import get_spectral_index_calculator
 
 
@@ -511,7 +503,7 @@ def chi2_for_params(theta, param_defs, early_params, fixed_predictions, xrt_data
         fitted_core_model.flux(xrt_data["time"].to_numpy(float), XRT_BAND[0], XRT_BAND[1], 10).total
     )
     xrt_diff = xrt_data["flux"].to_numpy(float) - xrt_model
-    chi2 += np.sum((xrt_diff / xrt_flux_error(xrt_data)) ** 2)
+    chi2 += np.sum((xrt_diff / flux_error(xrt_data)) ** 2)
 
     for dataset in optical_data:
         fitted_core_flux = np.asarray(
@@ -893,7 +885,7 @@ def main():
             make_core_model,
             to_physical,
             XRT_BAND,
-            xrt_flux_error,
+            flux_error,
         )
         save_bestfit_params(plot_dir, theta, log_prob, param_defs, early_params, early_dir, xrt_data, optical_data, free_w, jet_type=args.jet_type)
         
@@ -928,7 +920,7 @@ def main():
         make_core_model,
         to_physical,
         XRT_BAND,
-        xrt_flux_error,
+        flux_error,
     )
     save_bestfit_params(outdir, best_theta, best_log_prob, param_defs, early_params, early_dir, xrt_data, optical_data, free_w, jet_type=args.jet_type)
     

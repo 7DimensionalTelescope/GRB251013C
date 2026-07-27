@@ -16,10 +16,11 @@ from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet
 from VegasAfterglow.units import keV
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from grb.const import D_L, REDSHIFT
 from grb.io import read_data
-from utils import model_array, xrt_flux_error
+from grb.utils import flux_error, model_array
 
 # XRT band
 XRT_BAND = (0.3 * keV, 10.0 * keV)
@@ -101,7 +102,7 @@ def main():
     xrt_data = read_data("xrt")
     xrt_times_hr = xrt_data['time'].to_numpy(float) / 3600
     xrt_flux = xrt_data['flux'].to_numpy(float)
-    xrt_err = xrt_flux_error(xrt_data)
+    xrt_err = flux_error(xrt_data)
     print(f"  Loaded {len(xrt_data)} XRT points")
     
     # Test different parameter sets

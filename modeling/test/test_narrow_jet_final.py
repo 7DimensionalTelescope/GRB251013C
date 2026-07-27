@@ -9,16 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from final_model import (
-    load_all_optical_data,
-    make_core_model,
-    make_wing_model,
-    norris_flare,
-    XRT_BAND,
-)
-from utils import model_array, host_extinction_attenuation, xrt_flux_error
-from grb.const import REDSHIFT
+from grb.const import REDSHIFT, XRT_BAND
+from grb.functions import norris_flare
+from grb.modeling import load_all_optical_data, make_core_model, make_wing_model
+from grb.extinction import host_extinction_attenuation
+from grb.utils import flux_error, model_array
 
 
 def compute_full_model(params, xrt_times, i_times, i_nu, include_flare=True, include_wing=True):

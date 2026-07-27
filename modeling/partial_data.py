@@ -17,20 +17,14 @@ from VegasAfterglow.units import keV
 
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from grb.const import D_L, REDSHIFT, TRIGGER_TIME
+from grb.const import D_L, HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, TRIGGER_TIME
 from grb.io import read_data
-from utils import (
-    HOST_AV_LOG10_MEAN,
-    HOST_AV_LOG10_SIGMA,
-    ParamDefWithPrior,
-    compute_break_frequencies,
-    default_nwalkers,
-    host_extinction_attenuation,
-    load_xrt_spectral_index,
-    model_array,
-    plot_corner,
-    top_k_samples,
-)
+from grb.extinction import host_extinction_attenuation
+from grb.params import ParamDefWithPrior
+from grb.plotting import plot_corner
+from grb.results import top_k_samples
+from grb.spectral_index import compute_break_frequencies, load_xrt_spectral_index
+from grb.utils import model_array
 from spectral_index_interpolator import get_spectral_index_calculator
 
 PROJECT_DIR = Path(__file__).absolute().parent
