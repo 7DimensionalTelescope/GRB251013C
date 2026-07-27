@@ -98,3 +98,22 @@ def filter_width(filter_name):
     else:
         print(f"Invalid input type: {type(filter_name)}")
         return 0
+
+
+def flux_error(df):
+    return np.maximum(
+        np.abs(df["flux_high"].to_numpy(float)),
+        np.abs(df["flux_low"].to_numpy(float)),
+    )
+
+
+def seconds_from_trigger(date_obs):
+    import datetime
+    from .const import TRIGGER_TIME
+    """Convert date_obs string to seconds from trigger"""
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return (datetime.strptime(str(date_obs), fmt) - TRIGGER_TIME).total_seconds()
+        except ValueError:
+            continue
+    raise ValueError(f"Unsupported date_obs format: {date_obs}")

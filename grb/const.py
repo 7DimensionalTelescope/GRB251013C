@@ -10,6 +10,7 @@ SCRIPT_DIR = os.path.abspath(__file__)
 
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CIRCULAR_DATA_FILENAME = os.path.join(DATA_DIR, "circular.xlsx")
+I_DATA_FILENAME = os.path.join(DATA_DIR, "i_data.csv")
 XRT_DATA_FILENAME = os.path.join(DATA_DIR, "xrt.csv")
 XRT_INDEX_DATA_FILENAME = os.path.join(DATA_DIR, "xrt_index.csv")
 SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
@@ -24,6 +25,8 @@ D_L = cosmo.luminosity_distance(REDSHIFT).to("cm").value
 
 TRIGGER_TIME_STR = str(os.getenv("trigger_time"))
 TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S UTC")
+
+MODEL_RESOLUTIONS = (0.1, 0.25, 10)
 
 FILTER_INFO = {
     # Johnson–Cousins (Vega)
@@ -104,7 +107,7 @@ FILTER_INFO = {
     "i": {
         "system": "AB",
         "vega_zero_point_jy": None,
-        "central_wavelength_nm": 745.8,
+        "central_wavelength_nm": 762.5,
         "bandwidth_nm": 110.3,
     },
     "z": {

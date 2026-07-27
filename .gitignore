@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.ua/
+.claude/worktrees/
+
+# MCMC run outputs: large generated artifacts (.npy chains, PNG figures)
+modeling/fit_results/

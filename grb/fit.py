@@ -366,7 +366,7 @@ class Fitter:
         #         return self.log_likelihood(self.params)
 
 
-    def _run_bilby(self, sampler="dynesty", label="grb_fit", outdir="bilby_out", rescale=True, nlive=800, dlogz=0.2, walks=20, resume=True, **kwargs):
+    def _run_bilby(self, sampler="dynesty", label="grb_fit", outdir="bilby_out", rescale=True, npool=4, nlive=1000, dlogz=0.05, walks=20, resume=True, **kwargs):
         import bilby
 
         if self.y_data_error is None:
@@ -388,6 +388,7 @@ class Fitter:
             dlogz=dlogz,
             walks=walks,
             resume=resume,
+            npool=npool,
             **kwargs,
         )
 

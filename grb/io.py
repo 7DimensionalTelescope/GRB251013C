@@ -1,14 +1,24 @@
 import copy
 import pandas as pd
 import warnings
+import numpy as np
 
 warnings.simplefilter("ignore", RuntimeWarning)
 
 def read_data(filename, correct_galactic_extinction=False, add_converted_flux=False, **kwargs):
+    fixed_filter = None
     if filename == "circular":
         from .const import CIRCULAR_DATA_FILENAME
         filename = CIRCULAR_DATA_FILENAME
         kwargs = {}
+    elif filename == "i_data":
+        from .const import I_DATA_FILENAME
+        filename = I_DATA_FILENAME
+        fixed_filter = "i"
+        kwargs = {
+            "header": None,
+            "names": ["time", "magnitude", "mag_error"]
+        }
     elif filename == "xrt":
         from .const import XRT_DATA_FILENAME
         filename = XRT_DATA_FILENAME
@@ -39,10 +49,16 @@ def read_data(filename, correct_galactic_extinction=False, add_converted_flux=Fa
     else:
         raise ValueError(f"Unsupported file extension: {filename}")
     
+    if fixed_filter is not None:
+        df["filter"] = fixed_filter
+
     if "filter" in df.columns and "wavelength" not in df.columns:
         from .utils import filter_to_wavelength, filter_width
         df["wavelength"] = filter_to_wavelength(df["filter"])
         df["filter_width"] = filter_width(df["filter"])
+
+    if "time" in df.columns:
+        df = df.sort_values("time").reset_index(drop=True)
 
     if correct_galactic_extinction:
         from .extinction import correct_galactic_extinction
@@ -76,4 +92,3 @@ def filter_data(df, filter_name=None, facility_name = None, exclude_time_range=N
         filtered_df = filtered_df[~upper_limits]
 
     return filtered_df
-
