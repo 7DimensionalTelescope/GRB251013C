@@ -108,12 +108,20 @@ def flux_error(df):
 
 
 def seconds_from_trigger(date_obs):
-    import datetime
-    from .const import TRIGGER_TIME
     """Convert date_obs string to seconds from trigger"""
+    from datetime import datetime
+    from .const import TRIGGER_TIME
     for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
         try:
             return (datetime.strptime(str(date_obs), fmt) - TRIGGER_TIME).total_seconds()
         except ValueError:
             continue
     raise ValueError(f"Unsupported date_obs format: {date_obs}")
+
+
+def model_array(model_output):
+    if hasattr(model_output, "total"):
+        model_output = model_output.total
+    if hasattr(model_output, "sync"):
+        model_output = np.asarray(model_output.sync) + np.asarray(model_output.ssc)
+    return np.asarray(model_output).squeeze()

@@ -16,7 +16,7 @@ from .utils import filter_to_wavelength
 
 def correct_galactic_extinction(df, magnitude_column="magnitude", **kwargs):
     
-    if "gal_corrected" in df.columns and df["corrected"].all():
+    if "gal_corrected" in df.columns and df["gal_corrected"].all():
         print("Extinction already corrected")
         return df
     elif "gal_corrected" in df.columns and df["gal_corrected"].any():
