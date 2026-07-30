@@ -56,23 +56,31 @@ def default_nwalkers(ndim):
 def make_param_defs(include_flare=True, include_wing=True):
     """Parameter definitions
 
-    Updated to allow extremely narrow jets (like GRB 221009A: ~0.6-0.8 degrees)
-    theta_c_core: 0.001 to 0.052 rad (0.057° to 3°)
-    - Lower limit allows ultra-narrow jets
-    - Upper limit keeps core reasonably collimated
+    Bounds retuned (2026-07-30) from the joint re-optimization of the
+    final_flare_wing_20260724_171919 best fit inside a widened box
+    (logL -577.6 -> -548.0, total chi2 1154.9 -> 1095.8 on 232 points):
+    - tau_rise_flare and p_wing: the improved optimum sits OUTSIDE the old
+      bounds (25.5 s < 30 s; 3.06 > 2.9), so widening these is required.
+    - theta_c_core, n_ism, eps_B, E_iso_wing, eps_e_wing, theta_c_wing:
+      posterior modes hug the old walls; widened so the posterior can close.
+    - p and the eps_B lower range are deliberately NOT opened further:
+      chasing the observed XRT photon index (~1.88, vs model floor ~2.04)
+      via low eps_B / high p was tested and loses badly (dlogL <= -620) -
+      the spectral-index tension (chi2 ~ 88 for 45 pts) is a model
+      limitation, not a bounds artifact.
     """
     params = [
         # Core jet (narrow range to avoid bimodal distribution)
         ParamDefWithPrior("E_iso_core", 5e51, 1e53, Scale.LOG),
         ParamDefWithPrior("Gamma0_core", 300, 1100, Scale.LOG),  # Extended for narrow jets
-        ParamDefWithPrior("theta_c_core", 0.001, 0.04, Scale.LOG),  # 0.057° to 1.7° (avoid bimodal)
+        ParamDefWithPrior("theta_c_core", 0.001, 0.08, Scale.LOG),  # mode 0.039 hugged old 0.04 wall
 
         # Environment & forward shock microphysics
-        ParamDefWithPrior("n_ism", 5, 150, Scale.LOG),  # Extended: high density environment
+        ParamDefWithPrior("n_ism", 5, 400, Scale.LOG),  # mode ~147 hugged old 150 wall
         #ParamDefWithPrior("p", 2.1, 2.5, Scale.LINEAR),
         ParamDefWithPrior("p", 2.01, 2.3, Scale.LINEAR),
         ParamDefWithPrior("eps_e", 0.02, 0.1, Scale.LOG),
-        ParamDefWithPrior("eps_B", 0.005, 0.05, Scale.LOG),
+        ParamDefWithPrior("eps_B", 0.002, 0.05, Scale.LOG),  # mode ~0.0056; let left tail close
         ParamDefWithPrior("xi", 0.8, 1.0, Scale.LINEAR),
         ParamDefWithPrior("tau", 5, 30, Scale.LOG),  # Tighter: 5-30s to prevent late RS peak
 
@@ -92,7 +100,7 @@ def make_param_defs(include_flare=True, include_wing=True):
     if include_flare:
         params.extend([
             ParamDefWithPrior("t_start_flare", 1000, 5000, Scale.LOG),  # Wider range
-            ParamDefWithPrior("tau_rise_flare", 30, 2000, Scale.LOG),  # Lower limit for fast rise
+            ParamDefWithPrior("tau_rise_flare", 10, 2000, Scale.LOG),  # optimum 25.5s was below old 30s bound
             ParamDefWithPrior("tau_decay_flare", 1000, 10000, Scale.LOG),  # Extended
             ParamDefWithPrior("A_flare", 1e-10, 5e-9, Scale.LOG),  # Extended: allow brighter flares
             ParamDefWithPrior("flare_beta", 0.5, 1.2, Scale.LINEAR),
@@ -100,11 +108,11 @@ def make_param_defs(include_flare=True, include_wing=True):
 
     if include_wing:
         params.extend([
-            ParamDefWithPrior("E_iso_wing", 1e52, 1e53, Scale.LOG),  # Wider range
+            ParamDefWithPrior("E_iso_wing", 1e51, 1e53, Scale.LOG),  # old 1e52 floor clipped init & posterior
             ParamDefWithPrior("Gamma0_wing", 10, 100, Scale.LOG),  # Extended upper limit
-            ParamDefWithPrior("theta_c_wing", 0.2, 0.5, Scale.LOG),  # Wider wing: 11-29° (helps late-time emission)
-            ParamDefWithPrior("p_wing", 2.2, 2.9, Scale.LINEAR),  # Extended: allow steeper spectrum
-            ParamDefWithPrior("eps_e_wing", 0.3, 1.0, Scale.LOG),
+            ParamDefWithPrior("theta_c_wing", 0.2, 0.7, Scale.LOG),  # mode 0.49 hugged old 0.5 wall
+            ParamDefWithPrior("p_wing", 2.2, 3.3, Scale.LINEAR),  # optimum 3.06 was above old 2.9 bound
+            ParamDefWithPrior("eps_e_wing", 0.1, 1.0, Scale.LOG),  # mode 0.30 hugged old 0.3 wall
             ParamDefWithPrior("eps_B_wing", 0.001, 0.02, Scale.LOG),
             ParamDefWithPrior("xi_wing", 0.6, 1.0, Scale.LINEAR),
         ])

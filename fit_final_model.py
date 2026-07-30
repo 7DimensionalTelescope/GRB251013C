@@ -32,37 +32,39 @@ from grb.plotting import plot_corner, plot_light_curves, plot_spectral_index_com
 from grb.results import save_bestfit_params, save_run_arrays
 from grb.spectral_index import load_xrt_spectral_index
 
-# Initial positions (from best previous fits, adjusted for new constraints).
-# NOTE: p_r (3.329) and E_iso_wing (3e51) sit outside their declared bounds in
-# make_param_defs; the clip below pins those walkers to the boundary. Preserved
-# verbatim from modeling/final_model.py so runs stay comparable.
+# Initial positions: joint re-optimization of the
+# final_flare_wing_20260724_171919 best fit inside the widened bounds
+# (logL = -548.0 under the current data + spectral-index likelihood; scores
+# -550.3 as rounded here vs -577.6 for the previous guess).
+# NOTE: the previous guess had p_r=3.329 and E_iso_wing=3e51 OUTSIDE their
+# own bounds, so every walker started clipped onto those walls.
 INITIAL_GUESS = {
-    "E_iso_core": 1.189e52,
-    "Gamma0_core": 522,
-    "theta_c_core": 0.02,  # Adjusted: within new 0.001-0.03 rad range (narrower core)
-    "n_ism": 18.76,
-    "p": 2.158,
-    "eps_e": 0.0435,
-    "eps_B": 0.0163,
-    "xi": 0.943,
-    "tau": 15.0,  # Adjusted: within new 5-30s range, reasonable for RS
-    "p_r": 3.329,
-    "eps_e_r": 0.0422,
-    "eps_B_r": 0.20,  # Adjusted: within new 0.1-0.3 range, moderate value
-    "xi_r": 0.849,
-    "A_V": 0.0254,
-    "t_start_flare": 3000,
-    "tau_rise_flare": 300,
-    "tau_decay_flare": 2000,
-    "A_flare": 3e-10,
-    "flare_beta": 0.8,
-    "E_iso_wing": 3e51,
-    "Gamma0_wing": 30,
-    "theta_c_wing": 0.3,  # Adjusted: middle of new range (0.2-0.5 rad)
-    "p_wing": 2.3,
-    "eps_e_wing": 0.9,
-    "eps_B_wing": 0.005,
-    "xi_wing": 0.8,
+    "E_iso_core": 1.124e52,
+    "Gamma0_core": 551,
+    "theta_c_core": 0.0391,
+    "n_ism": 146.9,
+    "p": 2.164,
+    "eps_e": 0.0416,
+    "eps_B": 0.00563,
+    "xi": 0.897,
+    "tau": 12.8,
+    "p_r": 2.30,
+    "eps_e_r": 0.0511,
+    "eps_B_r": 0.162,
+    "xi_r": 0.852,
+    "A_V": 0.238,
+    "t_start_flare": 2553,
+    "tau_rise_flare": 25.5,
+    "tau_decay_flare": 2391,
+    "A_flare": 9.62e-10,
+    "flare_beta": 0.638,
+    "E_iso_wing": 1.011e52,
+    "Gamma0_wing": 19.2,
+    "theta_c_wing": 0.492,
+    "p_wing": 3.06,
+    "eps_e_wing": 0.303,
+    "eps_B_wing": 0.0121,
+    "xi_wing": 0.98,  # optimum is at the physical limit 1.0; start just inside
 }
 
 
@@ -85,11 +87,15 @@ def initial_positions(param_defs, nwalkers):
     for p in param_defs:
         if p.name in INITIAL_GUESS:
             center = INITIAL_GUESS[p.name]
+            # The initial guess is a converged optimum (logL ~ -550), so scatter
+            # walkers at roughly the posterior width (~0.1 dex) instead of the
+            # 0.3 dex used when the guess was rough - otherwise the ensemble
+            # starts ~50 logL downhill and wastes steps re-converging.
             if p.scale is Scale.LOG:
                 center_log = np.log10(center)
-                pos0.append(np.random.normal(center_log, 0.3, nwalkers))
+                pos0.append(np.random.normal(center_log, 0.1, nwalkers))
             else:
-                pos0.append(np.random.normal(center, center * 0.2, nwalkers))
+                pos0.append(np.random.normal(center, center * 0.05, nwalkers))
         else:
             if p.scale is Scale.LOG:
                 lower_log = np.log10(p.lower)
