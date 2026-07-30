@@ -193,60 +193,68 @@ def make_wing_model(params):
 
 def make_param_defs(include_flare=True, include_wing=True):
     """Parameter definitions
-    
-    Updated to allow extremely narrow jets (like GRB 221009A: ~0.6-0.8 degrees)
-    theta_c_core: 0.001 to 0.052 rad (0.057° to 3°)
-    - Lower limit allows ultra-narrow jets
-    - Upper limit keeps core reasonably collimated
+
+    Bounds retuned (2026-07-30) from the joint re-optimization of the
+    final_flare_wing_20260724_171919 best fit inside a widened box
+    (logL -577.6 -> -548.0, total chi2 1154.9 -> 1095.8 on 232 points):
+    - tau_rise_flare and p_wing: the improved optimum sits OUTSIDE the old
+      bounds (25.5 s < 30 s; 3.06 > 2.9), so widening these is required.
+    - theta_c_core, n_ism, eps_B, E_iso_wing, eps_e_wing, theta_c_wing:
+      posterior modes hug the old walls; widened so the posterior can close.
+    - p and the eps_B lower range are deliberately NOT opened further:
+      chasing the observed XRT photon index (~1.88, vs model floor ~2.04)
+      via low eps_B / high p was tested and loses badly (dlogL <= -620) -
+      the spectral-index tension (chi2 ~ 88 for 45 pts) is a model
+      limitation, not a bounds artifact.
     """
     params = [
         # Core jet (narrow range to avoid bimodal distribution)
         ParamDefWithPrior("E_iso_core", 5e51, 1e53, Scale.LOG),
         ParamDefWithPrior("Gamma0_core", 300, 1100, Scale.LOG),  # Extended for narrow jets
-        ParamDefWithPrior("theta_c_core", 0.001, 0.04, Scale.LOG),  # 0.057° to 1.7° (avoid bimodal)
-        
+        ParamDefWithPrior("theta_c_core", 0.001, 0.08, Scale.LOG),  # mode 0.039 hugged old 0.04 wall
+
         # Environment & forward shock microphysics
-        ParamDefWithPrior("n_ism", 5, 150, Scale.LOG),  # Extended: high density environment
+        ParamDefWithPrior("n_ism", 5, 400, Scale.LOG),  # mode ~147 hugged old 150 wall
         #ParamDefWithPrior("p", 2.1, 2.5, Scale.LINEAR),
         ParamDefWithPrior("p", 2.01, 2.3, Scale.LINEAR),
         ParamDefWithPrior("eps_e", 0.02, 0.1, Scale.LOG),
-        ParamDefWithPrior("eps_B", 0.005, 0.05, Scale.LOG),
+        ParamDefWithPrior("eps_B", 0.002, 0.05, Scale.LOG),  # mode ~0.0056; let left tail close
         ParamDefWithPrior("xi", 0.8, 1.0, Scale.LINEAR),
         ParamDefWithPrior("tau", 5, 30, Scale.LOG),  # Tighter: 5-30s to prevent late RS peak
-        
+
         # Reverse shock (constrained to prevent unphysical late peak)
         ParamDefWithPrior("p_r", 2.0, 3.0, Scale.LINEAR),
         ParamDefWithPrior("eps_e_r", 0.02, 0.1, Scale.LOG),
         ParamDefWithPrior("eps_B_r", 0.005, 0.3, Scale.LOG),  # Lower upper limit: prevent RS dominance
         ParamDefWithPrior("xi_r", 0.7, 1.0, Scale.LINEAR),
-        
+
         # Host extinction
         ParamDefWithPrior(
             "A_V", 0.001, 2.0, Scale.LOG,
             gaussian_prior=(HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA),
         ),
     ]
-    
+
     if include_flare:
         params.extend([
             ParamDefWithPrior("t_start_flare", 1000, 5000, Scale.LOG),  # Wider range
-            ParamDefWithPrior("tau_rise_flare", 30, 2000, Scale.LOG),  # Lower limit for fast rise
+            ParamDefWithPrior("tau_rise_flare", 10, 2000, Scale.LOG),  # optimum 25.5s was below old 30s bound
             ParamDefWithPrior("tau_decay_flare", 1000, 10000, Scale.LOG),  # Extended
             ParamDefWithPrior("A_flare", 1e-10, 5e-9, Scale.LOG),  # Extended: allow brighter flares
             ParamDefWithPrior("flare_beta", 0.5, 1.2, Scale.LINEAR),
         ])
-    
+
     if include_wing:
         params.extend([
-            ParamDefWithPrior("E_iso_wing", 1e52, 1e53, Scale.LOG),  # Wider range
+            ParamDefWithPrior("E_iso_wing", 1e51, 1e53, Scale.LOG),  # old 1e52 floor clipped init & posterior
             ParamDefWithPrior("Gamma0_wing", 10, 100, Scale.LOG),  # Extended upper limit
-            ParamDefWithPrior("theta_c_wing", 0.2, 0.5, Scale.LOG),  # Wider wing: 11-29° (helps late-time emission)
-            ParamDefWithPrior("p_wing", 2.2, 2.9, Scale.LINEAR),  # Extended: allow steeper spectrum
-            ParamDefWithPrior("eps_e_wing", 0.3, 1.0, Scale.LOG),
+            ParamDefWithPrior("theta_c_wing", 0.2, 0.7, Scale.LOG),  # mode 0.49 hugged old 0.5 wall
+            ParamDefWithPrior("p_wing", 2.2, 3.3, Scale.LINEAR),  # optimum 3.06 was above old 2.9 bound
+            ParamDefWithPrior("eps_e_wing", 0.1, 1.0, Scale.LOG),  # mode 0.30 hugged old 0.3 wall
             ParamDefWithPrior("eps_B_wing", 0.001, 0.02, Scale.LOG),
             ParamDefWithPrior("xi_wing", 0.6, 1.0, Scale.LINEAR),
         ])
-    
+
     return params
 
 
@@ -520,45 +528,53 @@ def main():
     print(f"Walkers: {nwalkers}")
     print(f"Steps: {args.nsteps}")
     
-    # Initial positions (from best previous fits, adjusted for new constraints)
+    # Initial positions: joint re-optimization of the
+    # final_flare_wing_20260724_171919 best fit inside the widened bounds
+    # (logL = -548.0 under the current data + spectral-index likelihood).
+    # NOTE: the previous guess had p_r=3.329 and E_iso_wing=3e51 OUTSIDE their
+    # own bounds, so every walker started clipped onto those walls.
     initial_guess = {
-        "E_iso_core": 1.189e52,
-        "Gamma0_core": 522,
-        "theta_c_core": 0.02,  # Adjusted: within new 0.001-0.03 rad range (narrower core)
-        "n_ism": 18.76,
-        "p": 2.158,
-        "eps_e": 0.0435,
-        "eps_B": 0.0163,
-        "xi": 0.943,
-        "tau": 15.0,  # Adjusted: within new 5-30s range, reasonable for RS
-        "p_r": 3.329,
-        "eps_e_r": 0.0422,
-        "eps_B_r": 0.20,  # Adjusted: within new 0.1-0.3 range, moderate value
-        "xi_r": 0.849,
-        "A_V": 0.0254,
-        "t_start_flare": 3000,
-        "tau_rise_flare": 300,
-        "tau_decay_flare": 2000,
-        "A_flare": 3e-10,
-        "flare_beta": 0.8,
-        "E_iso_wing": 3e51,
-        "Gamma0_wing": 30,
-        "theta_c_wing": 0.3,  # Adjusted: middle of new range (0.2-0.5 rad)
-        "p_wing": 2.3,
-        "eps_e_wing": 0.9,
-        "eps_B_wing": 0.005,
-        "xi_wing": 0.8,
+        "E_iso_core": 1.124e52,
+        "Gamma0_core": 551,
+        "theta_c_core": 0.0391,
+        "n_ism": 146.9,
+        "p": 2.164,
+        "eps_e": 0.0416,
+        "eps_B": 0.00563,
+        "xi": 0.897,
+        "tau": 12.8,
+        "p_r": 2.30,
+        "eps_e_r": 0.0511,
+        "eps_B_r": 0.162,
+        "xi_r": 0.852,
+        "A_V": 0.238,
+        "t_start_flare": 2553,
+        "tau_rise_flare": 25.5,
+        "tau_decay_flare": 2391,
+        "A_flare": 9.62e-10,
+        "flare_beta": 0.638,
+        "E_iso_wing": 1.011e52,
+        "Gamma0_wing": 19.2,
+        "theta_c_wing": 0.492,
+        "p_wing": 3.06,
+        "eps_e_wing": 0.303,
+        "eps_B_wing": 0.0121,
+        "xi_wing": 0.98,  # optimum is at the physical limit 1.0; start just inside
     }
     
     pos0 = []
     for p in param_defs:
         if p.name in initial_guess:
             center = initial_guess[p.name]
+            # The initial guess is a converged optimum (logL ~ -550), so scatter
+            # walkers at roughly the posterior width (~0.1 dex) instead of the
+            # 0.3 dex used when the guess was rough - otherwise the ensemble
+            # starts ~50 logL downhill and wastes steps re-converging.
             if p.scale is Scale.LOG:
                 center_log = np.log10(center)
-                pos0.append(np.random.normal(center_log, 0.3, nwalkers))
+                pos0.append(np.random.normal(center_log, 0.1, nwalkers))
             else:
-                pos0.append(np.random.normal(center, center * 0.2, nwalkers))
+                pos0.append(np.random.normal(center, center * 0.05, nwalkers))
         else:
             if p.scale is Scale.LOG:
                 lower_log = np.log10(p.lower)
