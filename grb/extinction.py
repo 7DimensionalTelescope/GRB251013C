@@ -9,14 +9,16 @@ from .const import DATA_DIR
 
 import extinction
 from dustmaps.sfd import SFDQuery
+from VegasAfterglow.extinction import BUILTIN_LAWS
 import pandas as pd
 import copy
 
+from .const import C_CM_PER_S, LN10_OVER_2P5
 from .utils import filter_to_wavelength
 
 def correct_galactic_extinction(df, magnitude_column="magnitude", **kwargs):
     
-    if "gal_corrected" in df.columns and df["corrected"].all():
+    if "gal_corrected" in df.columns and df["gal_corrected"].all():
         print("Extinction already corrected")
         return df
     elif "gal_corrected" in df.columns and df["gal_corrected"].any():
@@ -109,10 +111,30 @@ def host_galaxy_extinction(nu_obs, Av, eta=None, **kwargs):
 
     if eta is None:
         eta = host_galaxy_extinction_curve(nu_obs, **kwargs)
-    
+
     elif len(eta) != len(nu_obs):
         eta = host_galaxy_extinction_curve(nu_obs, **kwargs)
 
     return np.exp(-eta * Av / 1.086)
+
+
+def host_extinction_attenuation(nu_hz, a_v, redshift, profile="smc"):
+    """Host-galaxy extinction as a multiplicative attenuation on model flux.
+
+    Uses VegasAfterglow's built-in extinction laws, defaulting to SMC, and is
+    what the afterglow fit applies inside the model.
+
+    NOTE: this is NOT the same code path as `host_galaxy_extinction` above,
+    which interpolates the tabulated data/host_galaxy_extinction.csv curve and
+    defaults to MW. The two disagree; the fit uses this one. See
+    docs/superpowers/specs/2026-07-27-grb-module-refactor-design.md.
+    """
+    if a_v == 0:
+        return np.ones_like(np.asarray(nu_hz, dtype=float))
+
+    law = BUILTIN_LAWS[profile]
+    lambda_rest_cm = C_CM_PER_S / np.asarray(nu_hz, dtype=float) / (1.0 + redshift)
+    k_lambda = law(lambda_rest_cm)
+    return np.exp(-a_v * LN10_OVER_2P5 * k_lambda)
 
 

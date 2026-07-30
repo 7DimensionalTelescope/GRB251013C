@@ -66,3 +66,18 @@ def two_component_model(t, log_F_pl, alpha,
     F_broken = 10**power_law_log(t, log_F_pl, alpha) 
     F_smooth = 10**smooth_broken_power_law_log(t, log_F0_smooth, log_tb_smooth, alpha_r, alpha_d, kappa)
     return F_broken + F_smooth
+
+
+def norris_flare(t, t_start, tau_rise, tau_decay, amplitude):
+    """Norris function for GRB flare profile"""
+    flux = np.zeros_like(t, dtype=float)
+    mask = t > t_start
+    
+    if np.any(mask):
+        dt = t[mask] - t_start
+        with np.errstate(over='ignore', divide='ignore', invalid='ignore'):
+            flux[mask] = amplitude * np.exp(-tau_rise / dt - dt / tau_decay)
+        flux[~np.isfinite(flux)] = 0.0
+    
+    return flux
+
