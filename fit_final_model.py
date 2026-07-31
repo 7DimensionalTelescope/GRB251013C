@@ -32,39 +32,42 @@ from grb.plotting import plot_corner, plot_light_curves, plot_spectral_index_com
 from grb.results import save_bestfit_params, save_run_arrays
 from grb.spectral_index import load_xrt_spectral_index
 
-# Initial positions: joint re-optimization of the
-# final_flare_wing_20260724_171919 best fit inside the widened bounds
-# (logL = -548.0 under the current data + spectral-index likelihood; scores
-# -550.3 as rounded here vs -577.6 for the previous guess).
-# NOTE: the previous guess had p_r=3.329 and E_iso_wing=3e51 OUTSIDE their
-# own bounds, so every walker started clipped onto those walls.
+# Initial positions: emcee probe + Powell polish of the
+# final_flare_wing_20260730_171914 best fit inside the second-retune bounds
+# (p >= 1.6, p_wing >= 1.8, n_ism <= 1000). Scores logP = -436.7 vs -474.8
+# for that run's best sample; the gain comes from releasing the n_ism rail
+# (~530 vs the old 400 cap), NOT from lower p - with p < 2 available and
+# walkers seeded there, the posterior returns to p ~ 2.15, p_wing ~ 3.2.
+# Values are kept at full precision: the likelihood is sharp enough that
+# rounding to 3 significant figures costs ~65 logL.
+# xi/xi_r/xi_wing/p_r/p_wing optima sit ON their bounds; started just inside.
 INITIAL_GUESS = {
-    "E_iso_core": 1.124e52,
-    "Gamma0_core": 551,
-    "theta_c_core": 0.0391,
-    "n_ism": 146.9,
-    "p": 2.164,
-    "eps_e": 0.0416,
-    "eps_B": 0.00563,
-    "xi": 0.897,
-    "tau": 12.8,
-    "p_r": 2.30,
-    "eps_e_r": 0.0511,
-    "eps_B_r": 0.162,
-    "xi_r": 0.852,
-    "A_V": 0.238,
-    "t_start_flare": 2553,
-    "tau_rise_flare": 25.5,
-    "tau_decay_flare": 2391,
-    "A_flare": 9.62e-10,
-    "flare_beta": 0.638,
-    "E_iso_wing": 1.011e52,
-    "Gamma0_wing": 19.2,
-    "theta_c_wing": 0.492,
-    "p_wing": 3.06,
-    "eps_e_wing": 0.303,
-    "eps_B_wing": 0.0121,
-    "xi_wing": 0.98,  # optimum is at the physical limit 1.0; start just inside
+    "E_iso_core": 6.6226e51,
+    "Gamma0_core": 402.145,
+    "theta_c_core": 0.0784868,
+    "n_ism": 527.968,
+    "p": 2.15362,
+    "eps_e": 0.0670652,
+    "eps_B": 0.00396854,
+    "xi": 0.999,
+    "tau": 20.0651,
+    "p_r": 2.995,
+    "eps_e_r": 0.0362407,
+    "eps_B_r": 0.266559,
+    "xi_r": 0.999,
+    "A_V": 0.247939,
+    "t_start_flare": 2473.39,
+    "tau_rise_flare": 101.697,
+    "tau_decay_flare": 2097.6,
+    "A_flare": 1.22857e-9,
+    "flare_beta": 0.647954,
+    "E_iso_wing": 1.42319e52,
+    "Gamma0_wing": 14.8775,
+    "theta_c_wing": 0.651733,
+    "p_wing": 3.295,
+    "eps_e_wing": 0.31909,
+    "eps_B_wing": 0.00346853,
+    "xi_wing": 0.999,
 }
 
 

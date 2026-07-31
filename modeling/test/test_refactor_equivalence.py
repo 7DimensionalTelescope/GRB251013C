@@ -59,26 +59,29 @@ INITIAL_GUESS = {
 # every other parameter still equals the baseline bit-for-bit.
 RETUNED_BOUNDS = {
     "theta_c_core": (0.001, 0.08),      # was (0.001, 0.04)
-    "n_ism": (5, 400),                  # was (5, 150)
+    "n_ism": (5, 1000),                 # was (5, 150); 400 after first retune
+    "p": (1.6, 2.3),                    # was (2.01, 2.3); p<2 opened 2026-07-31
     "eps_B": (0.002, 0.05),             # was (0.005, 0.05)
     "tau_rise_flare": (10, 2000),       # was (30, 2000)
     "E_iso_wing": (1e51, 1e53),         # was (1e52, 1e53)
     "theta_c_wing": (0.2, 0.7),         # was (0.2, 0.5)
-    "p_wing": (2.2, 3.3),               # was (2.2, 2.9)
+    "p_wing": (1.8, 3.3),               # was (2.2, 2.9); lower edge opened 2026-07-31
     "eps_e_wing": (0.1, 1.0),           # was (0.3, 1.0)
 }
 
-# The driver's INITIAL_GUESS after the retune: the re-optimized parameter
-# vector (log_probability = -550.28 under the current data). Unlike the
-# baseline guess above, every value must lie INSIDE its own bounds.
+# The driver's INITIAL_GUESS after the second retune (2026-07-31): emcee
+# probe + Powell polish of the final_flare_wing_20260730_171914 best fit
+# (log_probability = -436.65 under the current data). Unlike the baseline
+# guess above, every value must lie INSIDE its own bounds.
 RETUNED_INITIAL_GUESS = {
-    "E_iso_core": 1.124e52, "Gamma0_core": 551, "theta_c_core": 0.0391, "n_ism": 146.9,
-    "p": 2.164, "eps_e": 0.0416, "eps_B": 0.00563, "xi": 0.897, "tau": 12.8,
-    "p_r": 2.30, "eps_e_r": 0.0511, "eps_B_r": 0.162, "xi_r": 0.852, "A_V": 0.238,
-    "t_start_flare": 2553, "tau_rise_flare": 25.5, "tau_decay_flare": 2391,
-    "A_flare": 9.62e-10, "flare_beta": 0.638, "E_iso_wing": 1.011e52, "Gamma0_wing": 19.2,
-    "theta_c_wing": 0.492, "p_wing": 3.06, "eps_e_wing": 0.303, "eps_B_wing": 0.0121,
-    "xi_wing": 0.98,
+    "E_iso_core": 6.6226e51, "Gamma0_core": 402.145, "theta_c_core": 0.0784868,
+    "n_ism": 527.968, "p": 2.15362, "eps_e": 0.0670652, "eps_B": 0.00396854,
+    "xi": 0.999, "tau": 20.0651, "p_r": 2.995, "eps_e_r": 0.0362407,
+    "eps_B_r": 0.266559, "xi_r": 0.999, "A_V": 0.247939,
+    "t_start_flare": 2473.39, "tau_rise_flare": 101.697, "tau_decay_flare": 2097.6,
+    "A_flare": 1.22857e-9, "flare_beta": 0.647954, "E_iso_wing": 1.42319e52,
+    "Gamma0_wing": 14.8775, "theta_c_wing": 0.651733, "p_wing": 3.295,
+    "eps_e_wing": 0.31909, "eps_B_wing": 0.00346853, "xi_wing": 0.999,
 }
 
 
@@ -422,14 +425,23 @@ def check_plotting(result_dir, compare_png=False):
         return d
 
     d_old, d_new = stage("old"), stage("new")
+    # band_draws=0 disables the (post-baseline) posterior envelope; with it off
+    # the light-curve figure must still reproduce the baseline byte-for-byte.
     BFMP.plot_light_curves(d_old)
-    P.plot_light_curves(d_new)
+    P.plot_light_curves(d_new, band_draws=0)
+    a, b = (d_old / "bestfit_lc.png").read_bytes(), (d_new / "bestfit_lc.png").read_bytes()
+    assert a == b, f"bestfit_lc.png differs ({len(a)} vs {len(b)} bytes)"
+    print("  bestfit_lc.png byte-identical (posterior band off)")
+
+    # The spectral-index figure intentionally diverges from the baseline: it
+    # now also draws the fitted total (core+wing) photon-index curve. Render
+    # both to prove neither path errors, and require the divergence is real.
     BFMP.plot_spectral_index_comparison(d_old)
     P.plot_spectral_index_comparison(d_new)
-    for name in ("bestfit_lc.png", "spectral_index_comparison.png"):
-        a, b = (d_old / name).read_bytes(), (d_new / name).read_bytes()
-        assert a == b, f"{name} differs ({len(a)} vs {len(b)} bytes)"
-        print(f"  {name} byte-identical")
+    a = (d_old / "spectral_index_comparison.png").read_bytes()
+    b = (d_new / "spectral_index_comparison.png").read_bytes()
+    assert a != b, "spectral_index_comparison.png should differ (total-index curve added)"
+    print("  spectral_index_comparison.png renders on both paths (documented divergence)")
 
 
 # --------------------------------------------------------------------------
