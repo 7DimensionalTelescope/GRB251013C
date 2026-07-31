@@ -63,11 +63,21 @@ def make_param_defs(include_flare=True, include_wing=True):
       bounds (25.5 s < 30 s; 3.06 > 2.9), so widening these is required.
     - theta_c_core, n_ism, eps_B, E_iso_wing, eps_e_wing, theta_c_wing:
       posterior modes hug the old walls; widened so the posterior can close.
-    - p and the eps_B lower range are deliberately NOT opened further:
-      chasing the observed XRT photon index (~1.88, vs model floor ~2.04)
-      via low eps_B / high p was tested and loses badly (dlogL <= -620) -
-      the spectral-index tension (chi2 ~ 88 for 45 pts) is a model
-      limitation, not a bounds artifact.
+    - the eps_B lower range is deliberately NOT opened further: chasing the
+      observed XRT photon index (~1.88, vs model floor ~2.04) via low eps_B /
+      high p was tested and loses badly (dlogL <= -620) - the spectral-index
+      tension (chi2 ~ 88 for 45 pts) is a model limitation, not a bounds
+      artifact.
+
+    Second retune (2026-07-31), after the final_flare_wing_20260730_171914 run:
+    - p opened below 2 (2.01 -> 1.6) and p_wing 2.2 -> 1.8: VegasAfterglow
+      supports hard (p < 2) electron spectra, and p ~ 1.76 would reproduce the
+      observed XRT photon index. A 600-step emcee probe with these bounds and
+      walkers seeded at p ~ 1.8 shows the posterior returns to p ~ 2.19,
+      p_wing ~ 3.15 (optical + XRT light-curve slopes dominate), but the
+      bounds no longer forbid the hard-spectrum solution.
+    - n_ism 400 -> 1000: the 20260730 run railed at 400; the probe optimum
+      sits near 500 (logP -474.8 -> -467.3 once released).
     """
     params = [
         # Core jet (narrow range to avoid bimodal distribution)
@@ -76,9 +86,9 @@ def make_param_defs(include_flare=True, include_wing=True):
         ParamDefWithPrior("theta_c_core", 0.001, 0.08, Scale.LOG),  # mode 0.039 hugged old 0.04 wall
 
         # Environment & forward shock microphysics
-        ParamDefWithPrior("n_ism", 5, 400, Scale.LOG),  # mode ~147 hugged old 150 wall
+        ParamDefWithPrior("n_ism", 5, 1000, Scale.LOG),  # 20260730 run railed at old 400
         #ParamDefWithPrior("p", 2.1, 2.5, Scale.LINEAR),
-        ParamDefWithPrior("p", 2.01, 2.3, Scale.LINEAR),
+        ParamDefWithPrior("p", 1.6, 2.3, Scale.LINEAR),  # p<2 allowed (hard spectrum, Gamma=p/2+1)
         ParamDefWithPrior("eps_e", 0.02, 0.1, Scale.LOG),
         ParamDefWithPrior("eps_B", 0.002, 0.05, Scale.LOG),  # mode ~0.0056; let left tail close
         ParamDefWithPrior("xi", 0.8, 1.0, Scale.LINEAR),
@@ -111,7 +121,7 @@ def make_param_defs(include_flare=True, include_wing=True):
             ParamDefWithPrior("E_iso_wing", 1e51, 1e53, Scale.LOG),  # old 1e52 floor clipped init & posterior
             ParamDefWithPrior("Gamma0_wing", 10, 100, Scale.LOG),  # Extended upper limit
             ParamDefWithPrior("theta_c_wing", 0.2, 0.7, Scale.LOG),  # mode 0.49 hugged old 0.5 wall
-            ParamDefWithPrior("p_wing", 2.2, 3.3, Scale.LINEAR),  # optimum 3.06 was above old 2.9 bound
+            ParamDefWithPrior("p_wing", 1.8, 3.3, Scale.LINEAR),  # p<2 allowed; optimum stays ~3.15
             ParamDefWithPrior("eps_e_wing", 0.1, 1.0, Scale.LOG),  # mode 0.30 hugged old 0.3 wall
             ParamDefWithPrior("eps_B_wing", 0.001, 0.02, Scale.LOG),
             ParamDefWithPrior("xi_wing", 0.6, 1.0, Scale.LINEAR),

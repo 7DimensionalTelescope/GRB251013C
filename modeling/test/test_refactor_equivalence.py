@@ -53,6 +53,37 @@ INITIAL_GUESS = {
     "xi_wing": 0.8,
 }
 
+# The bounds retune (commit 76aeca4) intentionally diverges from the baseline
+# parameter space. These are the ONLY allowed (lower, upper) differences;
+# check_params asserts the current values match this table exactly and that
+# every other parameter still equals the baseline bit-for-bit.
+RETUNED_BOUNDS = {
+    "theta_c_core": (0.001, 0.08),      # was (0.001, 0.04)
+    "n_ism": (5, 1000),                 # was (5, 150); 400 after first retune
+    "p": (1.6, 2.3),                    # was (2.01, 2.3); p<2 opened 2026-07-31
+    "eps_B": (0.002, 0.05),             # was (0.005, 0.05)
+    "tau_rise_flare": (10, 2000),       # was (30, 2000)
+    "E_iso_wing": (1e51, 1e53),         # was (1e52, 1e53)
+    "theta_c_wing": (0.2, 0.7),         # was (0.2, 0.5)
+    "p_wing": (1.8, 3.3),               # was (2.2, 2.9); lower edge opened 2026-07-31
+    "eps_e_wing": (0.1, 1.0),           # was (0.3, 1.0)
+}
+
+# The driver's INITIAL_GUESS after the second retune (2026-07-31): emcee
+# probe + Powell polish of the final_flare_wing_20260730_171914 best fit
+# (log_probability = -436.65 under the current data). Unlike the baseline
+# guess above, every value must lie INSIDE its own bounds.
+RETUNED_INITIAL_GUESS = {
+    "E_iso_core": 6.6226e51, "Gamma0_core": 402.145, "theta_c_core": 0.0784868,
+    "n_ism": 527.968, "p": 2.15362, "eps_e": 0.0670652, "eps_B": 0.00396854,
+    "xi": 0.999, "tau": 20.0651, "p_r": 2.995, "eps_e_r": 0.0362407,
+    "eps_B_r": 0.266559, "xi_r": 0.999, "A_V": 0.247939,
+    "t_start_flare": 2473.39, "tau_rise_flare": 101.697, "tau_decay_flare": 2097.6,
+    "A_flare": 1.22857e-9, "flare_beta": 0.647954, "E_iso_wing": 1.42319e52,
+    "Gamma0_wing": 14.8775, "theta_c_wing": 0.651733, "p_wing": 3.295,
+    "eps_e_wing": 0.31909, "eps_B_wing": 0.00346853, "xi_wing": 0.999,
+}
+
 
 def stage_baseline():
     """Materialise the pre-refactor modeling/ scripts from git and import them.
@@ -196,21 +227,31 @@ def check_spectral_index():
 def check_params():
     from grb.params import default_nwalkers, make_param_defs
 
+    retuned_seen = set()
     for flare in (True, False):
         for wing in (True, False):
             old, new = BFM.make_param_defs(flare, wing), make_param_defs(flare, wing)
             assert len(old) == len(new), (flare, wing, len(old), len(new))
             for o, n in zip(old, new):
                 assert o.name == n.name, (o.name, n.name)
-                assert o.lower == n.lower, (o.name, o.lower, n.lower)
-                assert o.upper == n.upper, (o.name, o.upper, n.upper)
+                if n.name in RETUNED_BOUNDS:
+                    lo, hi = RETUNED_BOUNDS[n.name]
+                    assert (n.lower, n.upper) == (lo, hi), (n.name, n.lower, n.upper)
+                    # the overlay must be a real divergence, not stale bookkeeping
+                    assert (o.lower, o.upper) != (lo, hi), (n.name, "baseline already matches")
+                    retuned_seen.add(n.name)
+                else:
+                    assert o.lower == n.lower, (o.name, o.lower, n.lower)
+                    assert o.upper == n.upper, (o.name, o.upper, n.upper)
                 assert o.scale == n.scale, (o.name,)
                 assert o.has_gaussian_prior() == n.has_gaussian_prior(), (o.name,)
                 assert o.get_prior_mean_sigma() == n.get_prior_mean_sigma(), (o.name,)
+    assert retuned_seen == set(RETUNED_BOUNDS), retuned_seen
 
     assert default_nwalkers(26) == max(4 * 26, 32) == 104
     assert default_nwalkers(2) == 32
-    print("  make_param_defs identical for all 4 flare/wing combinations")
+    print(f"  make_param_defs match baseline except the {len(RETUNED_BOUNDS)} documented "
+          f"retuned bounds, for all 4 flare/wing combinations")
 
 
 # --------------------------------------------------------------------------
@@ -263,10 +304,14 @@ def check_likelihood(xrt, opt, n_random=50):
     # would silently skip the Gaussian prior. check_params proved the sets identical.
     idx = load_xrt_spectral_index()
 
-    thetas = [reference_theta(pds)]
+    # Draw every theta inside the BASELINE box: the retuned bounds strictly
+    # contain it, so these points are valid under both parameter spaces and the
+    # frozen REF_* values keep their meaning. Thetas in the widened region
+    # would get -inf from the baseline log_prior by construction.
+    thetas = [reference_theta(bpds)]
     rng = np.random.default_rng(20260727)
     for _ in range(n_random):
-        thetas.append(np.array([rng.uniform(*bounds(p)) for p in pds]))
+        thetas.append(np.array([rng.uniform(*bounds(p)) for p in bpds]))
 
     n_finite = 0
     for i, th in enumerate(thetas):
@@ -380,14 +425,23 @@ def check_plotting(result_dir, compare_png=False):
         return d
 
     d_old, d_new = stage("old"), stage("new")
+    # band_draws=0 disables the (post-baseline) posterior envelope; with it off
+    # the light-curve figure must still reproduce the baseline byte-for-byte.
     BFMP.plot_light_curves(d_old)
-    P.plot_light_curves(d_new)
+    P.plot_light_curves(d_new, band_draws=0)
+    a, b = (d_old / "bestfit_lc.png").read_bytes(), (d_new / "bestfit_lc.png").read_bytes()
+    assert a == b, f"bestfit_lc.png differs ({len(a)} vs {len(b)} bytes)"
+    print("  bestfit_lc.png byte-identical (posterior band off)")
+
+    # The spectral-index figure intentionally diverges from the baseline: it
+    # now also draws the fitted total (core+wing) photon-index curve. Render
+    # both to prove neither path errors, and require the divergence is real.
     BFMP.plot_spectral_index_comparison(d_old)
     P.plot_spectral_index_comparison(d_new)
-    for name in ("bestfit_lc.png", "spectral_index_comparison.png"):
-        a, b = (d_old / name).read_bytes(), (d_new / name).read_bytes()
-        assert a == b, f"{name} differs ({len(a)} vs {len(b)} bytes)"
-        print(f"  {name} byte-identical")
+    a = (d_old / "spectral_index_comparison.png").read_bytes()
+    b = (d_new / "spectral_index_comparison.png").read_bytes()
+    assert a != b, "spectral_index_comparison.png should differ (total-index curve added)"
+    print("  spectral_index_comparison.png renders on both paths (documented divergence)")
 
 
 # --------------------------------------------------------------------------
@@ -397,7 +451,14 @@ def check_driver():
     from VegasAfterglow import Scale
     import fit_final_model as driver
 
-    assert driver.INITIAL_GUESS == INITIAL_GUESS
+    assert driver.INITIAL_GUESS == RETUNED_INITIAL_GUESS
+
+    # The regression that motivated the retune: the old guess had p_r and
+    # E_iso_wing OUTSIDE their own bounds, silently clipping every walker onto
+    # the boundary. The guess must lie strictly inside the box.
+    for p in driver.make_param_defs(True, True):
+        v = driver.INITIAL_GUESS[p.name]
+        assert p.lower <= v <= p.upper, (p.name, v, p.lower, p.upper)
 
     args = driver.parse_args([])
     assert (args.include_flare, args.include_wing, args.use_spectral_index) == (True, True, True)
