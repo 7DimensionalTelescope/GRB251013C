@@ -1,0 +1,45 @@
+FLARE-X A_V = 0.0358   INCUMBENT A_V = 0.2076
+FLARE-X has E_iso_wing: False   INCUMBENT has E_iso_wing: True
+
+galactic extinction used: {'VT/B': 0.2122, 'green': 0.196, 'r': 0.1351, 'R': 0.1242, 'VT/R': 0.1242, 'i': 0.1, 'I': 0.1, 'z': 0.0786, 'y': 0.0661}
+(brief quoted A_r=0.135 A_i=0.100 A_z=0.079)
+
+=== residual median (model - parsed), mag; POSITIVE = model too FAINT ===
+             [2e+04,6e+04]             [1e+05,4e+05]             [4e+05,7e+05]       
+band      FLARE-X    INCUMB  nbin   FLARE-X    INCUMB  nbin   FLARE-X    INCUMB  nbin
+r           -0.12     -0.80     9      0.07      0.24     8      1.03      1.92     6
+VT/R            -         -     0     -0.56     -0.78     8      0.87      1.86     2
+R            0.12     -0.39     5     -0.32     -0.27    14      0.95      1.78     6
+i           -0.18     -1.03    10      0.50      0.70     4         -         -     0
+z            0.90     -0.07     7     -0.00     -0.16    10      0.93      1.56     6
+green       -0.16     -0.59     8      0.11      0.47    11      1.10      2.20     6
+VT/B            -         -     0     -0.30     -0.18     8      1.18      2.27     5
+y           -0.18     -1.20     7         -         -     0         -         -     0
+
+=== which model is CLOSER (|residual|)?  per band x window ===
+  window [2e+04,6e+04]: FLARE-X closer in 5 bands, INCUMBENT in 1
+      r      |FLARE-X|= 0.12  |INCUMB|= 0.80  -> FLARE-X
+      R      |FLARE-X|= 0.12  |INCUMB|= 0.39  -> FLARE-X
+      i      |FLARE-X|= 0.18  |INCUMB|= 1.03  -> FLARE-X
+      z      |FLARE-X|= 0.90  |INCUMB|= 0.07  -> INCUMBENT
+      green  |FLARE-X|= 0.16  |INCUMB|= 0.59  -> FLARE-X
+      y      |FLARE-X|= 0.18  |INCUMB|= 1.20  -> FLARE-X
+  window [1e+05,4e+05]: FLARE-X closer in 5 bands, INCUMBENT in 2
+      r      |FLARE-X|= 0.07  |INCUMB|= 0.24  -> FLARE-X
+      VT/R   |FLARE-X|= 0.56  |INCUMB|= 0.78  -> FLARE-X
+      R      |FLARE-X|= 0.32  |INCUMB|= 0.27  -> INCUMBENT
+      i      |FLARE-X|= 0.50  |INCUMB|= 0.70  -> FLARE-X
+      z      |FLARE-X|= 0.00  |INCUMB|= 0.16  -> FLARE-X
+      green  |FLARE-X|= 0.11  |INCUMB|= 0.47  -> FLARE-X
+      VT/B   |FLARE-X|= 0.30  |INCUMB|= 0.18  -> INCUMBENT
+  window [4e+05,7e+05]: FLARE-X closer in 6 bands, INCUMBENT in 0
+      r      |FLARE-X|= 1.03  |INCUMB|= 1.92  -> FLARE-X
+      VT/R   |FLARE-X|= 0.87  |INCUMB|= 1.86  -> FLARE-X
+      R      |FLARE-X|= 0.95  |INCUMB|= 1.78  -> FLARE-X
+      z      |FLARE-X|= 0.93  |INCUMB|= 1.56  -> FLARE-X
+      green  |FLARE-X|= 1.10  |INCUMB|= 2.20  -> FLARE-X
+      VT/B   |FLARE-X|= 1.18  |INCUMB|= 2.27  -> FLARE-X
+
+=== aggregate over r,VT/R,R,i,z bins with 2e4 < t < 7e5 ===
+  FLARE-X    n= 110 median= -0.05 mean= +0.15 rms= 0.76 median|res|= 0.60
+  INCUMBENT  n= 110 median= -0.39 mean= +0.01 rms= 1.22 median|res|= 1.11

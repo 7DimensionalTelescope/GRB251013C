@@ -19,7 +19,8 @@ from .const import (
 from .extinction import host_extinction_attenuation
 from .functions import norris_flare
 from .modeling import make_core_model, make_wing_model
-from .params import ParamDefWithPrior
+from .params import dataset_cal_factor
+from .prior import ParamDefWithPrior
 from .utils import model_array
 
 
@@ -153,8 +154,8 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
             attenuation = host_extinction_attenuation(nu, params["A_V"], REDSHIFT)
             opt_flux *= attenuation
 
-        # Convert to mJy
-        opt_flux_mJy = opt_flux * 1e26
+        # Convert to mJy and apply cross-calibration scale (7DT reference => 1)
+        opt_flux_mJy = opt_flux * 1e26 * dataset_cal_factor(params, dataset['name'])
         optical_fluxes.append(opt_flux_mJy)
 
     # XRT spectral-index chi2 (reuses the already-built core/wing models)

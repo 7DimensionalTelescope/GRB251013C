@@ -119,6 +119,22 @@ def seconds_from_trigger(date_obs):
     raise ValueError(f"Unsupported date_obs format: {date_obs}")
 
 
+def mjd_to_seconds_from_trigger(mjd):
+    """Convert MJD (scalar or array) to seconds from trigger."""
+    from astropy.time import Time
+    from .const import TRIGGER_TIME
+    trigger_mjd = Time(TRIGGER_TIME.strftime("%Y-%m-%dT%H:%M:%S")).mjd
+    return (np.asarray(mjd, dtype=float) - trigger_mjd) * 86400.0
+
+
+def normalize_filter_name(filter_name):
+    """Map catalog filter labels (e.g. sdssi) onto FILTER_INFO keys (e.g. i)."""
+    name = str(filter_name).strip()
+    if name.lower().startswith("sdss") and len(name) > 4:
+        return name[4:]
+    return name
+
+
 def model_array(model_output):
     if hasattr(model_output, "total"):
         model_output = model_output.total

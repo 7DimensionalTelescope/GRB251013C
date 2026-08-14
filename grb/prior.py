@@ -1,3 +1,53 @@
+"""Priors for the fits.
+
+ParamDefWithPrior wraps VegasAfterglow's ParamDef to add an optional Gaussian
+prior on top of the box bounds (used by the afterglow MCMC fit). The
+*_prior functions below provide default bounds/priors for the empirical
+curve-fit models.
+"""
+from VegasAfterglow import ParamDef, Scale
+
+
+class ParamDefWithPrior:
+    """Extended ParamDef that supports gaussian priors."""
+
+    def __init__(self, name, lower, upper, scale=Scale.LINEAR, initial=None, gaussian_prior=None):
+        self.param_def = ParamDef(name, lower, upper, scale, initial)
+        self.gaussian_prior = gaussian_prior
+
+    @property
+    def name(self):
+        return self.param_def.name
+
+    @property
+    def lower(self):
+        return self.param_def.lower
+
+    @property
+    def upper(self):
+        return self.param_def.upper
+
+    @property
+    def scale(self):
+        return self.param_def.scale
+
+    @property
+    def initial(self):
+        return self.param_def.initial
+
+    def has_gaussian_prior(self):
+        return self.gaussian_prior is not None
+
+    def get_prior_mean_sigma(self):
+        if self.gaussian_prior is None:
+            return None, None
+        return self.gaussian_prior
+
+    def to_param_def(self):
+        """Return the underlying ParamDef for VegasAfterglow compatibility."""
+        return self.param_def
+
+
 def power_law_prior(data_type="lightcurve", **kwargs):
     if data_type == "lightcurve":
         default_param_bounds = {

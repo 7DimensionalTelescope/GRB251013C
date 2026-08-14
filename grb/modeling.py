@@ -4,12 +4,13 @@ Builds the VegasAfterglow core-jet (with optional reverse shock) and wing-jet
 models, and loads every XRT and optical dataset the fit uses.
 """
 import numpy as np
+import pandas as pd
 
 from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet
 
 from .const import D_L, REDSHIFT, MODEL_RESOLUTIONS
 from .io import read_data, filter_data
-from .utils import flux_error, seconds_from_trigger
+from .utils import flux_error, mJy_to_erg_cm2_s_Hz, seconds_from_trigger, unit_conversion
 
 
 def load_all_optical_data():
@@ -61,6 +62,53 @@ def load_all_optical_data():
         })
     
     return xrt_dict, optical_datasets
+
+
+def add_observation(df, fitter, input_type="flux_density", label=None, **kwargs):
+    """Add a DataFrame of observations to a VegasAfterglow Fitter.
+
+    input_type="flux_density": single-frequency light curve (mJy columns).
+    input_type="flux": band-integrated flux, defaulting to the XRT 0.3-10 keV
+    band (override with nu_min/nu_max in Hz).
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("df must be a pandas DataFrame")
+
+    if input_type == "flux_density":
+        if not all(df["gal_corrected"]):
+            raise ValueError("Galactic extinction not corrected")
+        if not all(df["host_corrected"]):
+            raise ValueError("Host galaxy extinction not corrected")
+
+        fitter.add_flux_density(
+            nu=float(df["frequency_Hz"].iloc[0]),
+            t=df["time"].to_numpy(float),
+            f_nu=mJy_to_erg_cm2_s_Hz(df["flux_mJy"].to_numpy(float)),
+            err=mJy_to_erg_cm2_s_Hz(df["flux_mJy_error"].to_numpy(float)),
+            label=label,
+        )
+    elif input_type == "flux":
+        nu_min = kwargs.pop("nu_min", unit_conversion(0.3, "keV", "Hz"))
+        nu_max = kwargs.pop("nu_max", unit_conversion(10, "keV", "Hz"))
+        num_points = kwargs.pop("num_points", 5)
+
+        if "flux_high" in df.columns and "flux_low" in df.columns:
+            err = flux_error(df)
+        else:
+            err = df["flux_error"].to_numpy(float)
+
+        fitter.add_flux(
+            band=(nu_min, nu_max),
+            t=df["time"].to_numpy(float),
+            flux=df["flux"].to_numpy(float),
+            err=err,
+            num_points=num_points,
+            label=label,
+        )
+    else:
+        raise ValueError(f"Invalid input type: {input_type}")
+
+    return fitter
 
 
 def make_core_model(params):

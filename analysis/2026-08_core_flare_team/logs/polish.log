@@ -1,0 +1,30 @@
+start logP = -467.28
+polished logP = -435.88  (20000 evals)
+using polished vector, logP=-435.88
+
+log10_E_iso_core           51.8210    6.6226e+51
+log10_Gamma0_core           2.6044       402.145
+log10_theta_c_core         -1.1052     0.0784868
+log10_n_ism                 2.7226       527.968
+p                           2.1536       2.15362
+log10_eps_e                -1.1735     0.0670652
+log10_eps_B                -2.4014    0.00396854
+xi                          1.0000             1
+log10_tau                   1.3024       20.0651
+p_r                         3.0000             3
+log10_eps_e_r              -1.4408     0.0362407
+log10_eps_B_r              -0.5742      0.266559
+xi_r                        1.0000             1
+log10_A_V                  -0.6057      0.247939
+log10_t_start_flare         3.3933       2473.39
+log10_tau_rise_flare        2.0073       101.697
+log10_tau_decay_flare       3.3217        2097.6
+log10_A_flare              -8.9106   1.22857e-09
+flare_beta                  0.6480      0.647954
+log10_E_iso_wing           52.1533   1.42319e+52
+log10_Gamma0_wing           1.1725       14.8775
+log10_theta_c_wing         -0.1859      0.651733
+p_wing                      3.3000           3.3
+log10_eps_e_wing           -0.4961       0.31909
+log10_eps_B_wing           -2.4599    0.00346853
+xi_wing                     1.0000             1

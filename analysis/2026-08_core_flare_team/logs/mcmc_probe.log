@@ -1,0 +1,47 @@
+step 50: best so far -532.10, cur max -532.10
+step 100: best so far -526.14, cur max -526.14
+step 150: best so far -488.19, cur max -488.19
+step 200: best so far -483.71, cur max -483.71
+step 250: best so far -479.96, cur max -479.96
+step 300: best so far -476.59, cur max -478.08
+step 350: best so far -470.74, cur max -471.08
+step 400: best so far -470.74, cur max -471.04
+step 450: best so far -470.34, cur max -471.24
+step 500: best so far -470.34, cur max -470.49
+step 550: best so far -469.65, cur max -470.49
+step 600: best so far -467.28, cur max -467.28
+
+BEST logP = -467.28  (run best was -474.78)
+log10_E_iso_core           51.7735    5.9362e+51
+log10_Gamma0_core           2.7007        502.05
+log10_theta_c_core         -1.1410      0.072277
+log10_n_ism                 2.7022        503.75
+p                           2.1849        2.1849
+log10_eps_e                -1.1917      0.064314
+log10_eps_B                -2.3822     0.0041474
+xi                          0.8943       0.89429
+log10_tau                   1.3116        20.492
+p_r                         2.2667        2.2667
+log10_eps_e_r              -1.3863      0.041084
+log10_eps_B_r              -0.6056       0.24798
+xi_r                        0.8980       0.89799
+log10_A_V                  -0.6413       0.22841
+log10_t_start_flare         3.3411        2193.3
+log10_tau_rise_flare        1.9405        87.189
+log10_tau_decay_flare       3.3439        2207.7
+log10_A_flare              -8.9272    1.1825e-09
+flare_beta                  0.6456       0.64555
+log10_E_iso_wing           52.1485    1.4077e+52
+log10_Gamma0_wing           1.1747        14.952
+log10_theta_c_wing         -0.1930       0.64119
+p_wing                      3.2181        3.2181
+log10_eps_e_wing           -0.4678       0.34059
+log10_eps_B_wing           -2.5359     0.0029115
+xi_wing                     0.9895       0.98953
+
+413 samples within 5 of best:
+  p                    16/50/84%: 2.182 2.194 2.208
+  p_wing               16/50/84%: 3.124 3.131 3.170
+  log10_n_ism          16/50/84%: 2.654 2.671 2.716
+  log10_theta_c_wing   16/50/84%: -0.217 -0.211 -0.205
+  log10_eps_B          16/50/84%: -2.302 -2.300 -2.281

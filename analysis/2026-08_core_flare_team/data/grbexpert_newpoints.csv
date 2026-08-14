@@ -1,0 +1,48 @@
+# GRB 251013C -- four published data points NOT currently in the fit.
+# Compiled by the GRB-expert role. T0 = 2025-10-13T17:39:42 UTC (SVOM/ECLAIRs trigger).
+# t_s = seconds since T0, OBSERVER frame. z = 0.572.
+#
+# SCHEMA
+#   instrument   : facility
+#   t_s          : time since T0 [s]  (see t_note for start-vs-midpoint)
+#   quantity     : "band_flux" (integrated over nu_lo..nu_hi) or "flux_density" (monochromatic)
+#   nu_lo_Hz     : low edge of band; for flux_density this is THE frequency
+#   nu_hi_Hz     : high edge of band; blank for flux_density
+#   value,error  : in the units given by "unit"
+#   err_source   : PUBLISHED (quoted in the circular) or ESTIMATED (mine -- see notes)
+#
+# CITATIONS
+#   Chandra : GCN 42642, Martin-Carrillo, Gompertz & Malesani, 2025-11-11.
+#             40 ks DDT (ObsID 31983) starting 2025-11-09T03:09:42 = T0+27.396 d.
+#             "flux in the 0.3-10 keV energy range of ~2.5e-15 erg s^-1 cm^-2",
+#             assuming the Swift/XRT spectral model (NH=6.48e20, Gamma=1.78).
+#             Same circular infers a JET BREAK between 6 and 10 days (observer frame).
+#   ALMA    : GCN 42243, Laskar et al., 2025-10-14. 97.5 GHz, "flux density of ~0.3 mJy".
+#   AMI-LA  : GCN 42294, Rhodes et al., 2025-10-15. 15.5 GHz, 4 hr block from 2025-10-14T19:27:08.
+#   VLA     : GCN 42312, Christy et al., 2025-10-16. 10 GHz, from 2025-10-15T02:15 UT.
+#
+# CAVEATS -- READ BEFORE FITTING
+#  1. Chandra and ALMA errors are ESTIMATED, not published; both circulars write "~".
+#     Chandra: 30% assumed (a 40 ks ACIS detection at this flux is ~20 counts -> ~22%
+#     Poisson, widened for the quoted rounding). ALMA: 15% assumed (mm calibration
+#     systematic ~10% plus "preliminary"). Treat both as soft; do not let either
+#     dominate a chi2. The Chandra point's VALUE is what matters -- FLARE-X
+#     over-predicts it by 3.5x regardless of any plausible error bar.
+#  2. AMI-LA position was RA 23h03m20.5s +/-0.2s, Dec -00d12'26" +/-9", i.e. ~11" from
+#     the ALMA/VLA position (within its own error, but AMI-LA has a ~30" beam).
+#     Confusion with a nearby source cannot be excluded. Lowest-weight point of the four.
+#  3. ALMA t_s is the observation START (23:07 UT exactly); the circular rounds to
+#     "5.5 hours" and does not publish a mid-time. True mid-time is later by roughly
+#     half an execution block (~15-30 min). The mm light curve is slowly varying here
+#     so this is a sub-10% effect, but do not quote t to 3 significant figures.
+#  4. Radio fluxes are NOT host-subtracted and need no extinction correction.
+#     X-ray flux is OBSERVED (absorbed), matching the convention of grb/io.py "xrt".
+#  5. All four are forward-shock probes the current fit has never seen. FLARE-X
+#     (n_ism=134) over-predicts ALMA by 14x and VLA by 1.6x while matching AMI;
+#     no value of n_ism repairs ALMA (best ~2.5x over, at n_ism=1).
+#
+instrument,t_s,quantity,nu_lo_Hz,nu_hi_Hz,value,error,unit,err_source,t_note,gcn
+Chandra,2367014.4,band_flux,7.25e16,2.42e18,2.5e-15,7.5e-16,erg cm^-2 s^-1,ESTIMATED,T0+27.396 d as published; 40 ks exposure,42642
+ALMA,19638,flux_density,97.5e9,,0.300,0.045,mJy,ESTIMATED,observation START; mid-time not published,42243
+AMI-LA,100046,flux_density,15.5e9,,0.340,0.080,mJy,PUBLISHED,midpoint of 4 hr block starting 19:27:08 UT,42294
+VLA,117318,flux_density,10.0e9,,0.111,0.012,mJy,PUBLISHED,observation START; circular quotes 1.36 d,42312

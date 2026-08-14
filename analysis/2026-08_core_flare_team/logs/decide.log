@@ -1,0 +1,36 @@
+BASELINE (171919 best, untouched) logL+prior = -577.57
+
+A_baseline_renorm        logL+prior=   -575.18   delta=    +2.39
+B_p2.2_eB1e-4_n137       logL+prior=  -1197.51   delta=  -619.94
+B_p2.4_eB1e-5_n137       logL+prior=  -1286.10   delta=  -708.53
+B_p2.6_eB1e-6_n137       logL+prior=  -1352.30   delta=  -774.73
+B_p2.6_eB1e-5_n30        logL+prior=  -5677.35   delta= -5099.78
+B_p2.4_eB1e-4_n10        logL+prior= -23818.48   delta=-23240.91
+
+=== BEST: A_baseline_renorm  logL+prior=-575.18 (delta +2.39) ===
+  log10_E_iso_core           52.0364    1.0874e+52 <--
+  log10_Gamma0_core           2.6252        421.87
+  log10_theta_c_core         -1.4094      0.038955 <--
+  log10_n_ism                 2.1379        137.38
+  p                           2.1938        2.1938
+  log10_eps_e                -1.3871      0.041016 <--
+  log10_eps_B                -2.2484     0.0056437
+  xi                          0.9434       0.94339
+  log10_tau                   1.1914        15.538
+  p_r                         2.7538        2.7538
+  log10_eps_e_r              -1.3407      0.045636
+  log10_eps_B_r              -0.8385       0.14505
+  xi_r                        0.7650       0.76495
+  log10_A_V                  -0.6308       0.23401
+  log10_t_start_flare         3.3898        2453.3
+  log10_tau_rise_flare        2.2438        175.31
+  log10_tau_decay_flare       3.3973        2496.1
+  log10_A_flare              -9.0347    9.2331e-10
+  flare_beta                  0.6412       0.64117
+  log10_E_iso_wing           52.0034    1.0079e+52
+  log10_Gamma0_wing           1.2879        19.402
+  log10_theta_c_wing         -0.3091       0.49075
+  p_wing                      2.8643        2.8643
+  log10_eps_e_wing           -0.5094       0.30944
+  log10_eps_B_wing           -1.9414      0.011446
+  xi_wing                     0.9935       0.99346

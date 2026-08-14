@@ -53,6 +53,34 @@ INITIAL_GUESS = {
     "xi_wing": 0.8,
 }
 
+# The bounds retune (commit 76aeca4) intentionally diverges from the baseline
+# parameter space. These are the ONLY allowed (lower, upper) differences;
+# check_params asserts the current values match this table exactly and that
+# every other parameter still equals the baseline bit-for-bit.
+RETUNED_BOUNDS = {
+    "theta_c_core": (0.001, 0.08),      # was (0.001, 0.04)
+    "n_ism": (5, 400),                  # was (5, 150)
+    "eps_B": (0.002, 0.05),             # was (0.005, 0.05)
+    "tau_rise_flare": (10, 2000),       # was (30, 2000)
+    "E_iso_wing": (1e51, 1e53),         # was (1e52, 1e53)
+    "theta_c_wing": (0.2, 0.7),         # was (0.2, 0.5)
+    "p_wing": (2.2, 3.3),               # was (2.2, 2.9)
+    "eps_e_wing": (0.1, 1.0),           # was (0.3, 1.0)
+}
+
+# The driver's INITIAL_GUESS after the retune: the re-optimized parameter
+# vector (log_probability = -550.28 under the current data). Unlike the
+# baseline guess above, every value must lie INSIDE its own bounds.
+RETUNED_INITIAL_GUESS = {
+    "E_iso_core": 1.124e52, "Gamma0_core": 551, "theta_c_core": 0.0391, "n_ism": 146.9,
+    "p": 2.164, "eps_e": 0.0416, "eps_B": 0.00563, "xi": 0.897, "tau": 12.8,
+    "p_r": 2.30, "eps_e_r": 0.0511, "eps_B_r": 0.162, "xi_r": 0.852, "A_V": 0.238,
+    "t_start_flare": 2553, "tau_rise_flare": 25.5, "tau_decay_flare": 2391,
+    "A_flare": 9.62e-10, "flare_beta": 0.638, "E_iso_wing": 1.011e52, "Gamma0_wing": 19.2,
+    "theta_c_wing": 0.492, "p_wing": 3.06, "eps_e_wing": 0.303, "eps_B_wing": 0.0121,
+    "xi_wing": 0.98,
+}
+
 
 def stage_baseline():
     """Materialise the pre-refactor modeling/ scripts from git and import them.
@@ -196,21 +224,31 @@ def check_spectral_index():
 def check_params():
     from grb.params import default_nwalkers, make_param_defs
 
+    retuned_seen = set()
     for flare in (True, False):
         for wing in (True, False):
             old, new = BFM.make_param_defs(flare, wing), make_param_defs(flare, wing)
             assert len(old) == len(new), (flare, wing, len(old), len(new))
             for o, n in zip(old, new):
                 assert o.name == n.name, (o.name, n.name)
-                assert o.lower == n.lower, (o.name, o.lower, n.lower)
-                assert o.upper == n.upper, (o.name, o.upper, n.upper)
+                if n.name in RETUNED_BOUNDS:
+                    lo, hi = RETUNED_BOUNDS[n.name]
+                    assert (n.lower, n.upper) == (lo, hi), (n.name, n.lower, n.upper)
+                    # the overlay must be a real divergence, not stale bookkeeping
+                    assert (o.lower, o.upper) != (lo, hi), (n.name, "baseline already matches")
+                    retuned_seen.add(n.name)
+                else:
+                    assert o.lower == n.lower, (o.name, o.lower, n.lower)
+                    assert o.upper == n.upper, (o.name, o.upper, n.upper)
                 assert o.scale == n.scale, (o.name,)
                 assert o.has_gaussian_prior() == n.has_gaussian_prior(), (o.name,)
                 assert o.get_prior_mean_sigma() == n.get_prior_mean_sigma(), (o.name,)
+    assert retuned_seen == set(RETUNED_BOUNDS), retuned_seen
 
     assert default_nwalkers(26) == max(4 * 26, 32) == 104
     assert default_nwalkers(2) == 32
-    print("  make_param_defs identical for all 4 flare/wing combinations")
+    print(f"  make_param_defs match baseline except the {len(RETUNED_BOUNDS)} documented "
+          f"retuned bounds, for all 4 flare/wing combinations")
 
 
 # --------------------------------------------------------------------------
@@ -263,10 +301,14 @@ def check_likelihood(xrt, opt, n_random=50):
     # would silently skip the Gaussian prior. check_params proved the sets identical.
     idx = load_xrt_spectral_index()
 
-    thetas = [reference_theta(pds)]
+    # Draw every theta inside the BASELINE box: the retuned bounds strictly
+    # contain it, so these points are valid under both parameter spaces and the
+    # frozen REF_* values keep their meaning. Thetas in the widened region
+    # would get -inf from the baseline log_prior by construction.
+    thetas = [reference_theta(bpds)]
     rng = np.random.default_rng(20260727)
     for _ in range(n_random):
-        thetas.append(np.array([rng.uniform(*bounds(p)) for p in pds]))
+        thetas.append(np.array([rng.uniform(*bounds(p)) for p in bpds]))
 
     n_finite = 0
     for i, th in enumerate(thetas):
@@ -397,7 +439,14 @@ def check_driver():
     from VegasAfterglow import Scale
     import fit_final_model as driver
 
-    assert driver.INITIAL_GUESS == INITIAL_GUESS
+    assert driver.INITIAL_GUESS == RETUNED_INITIAL_GUESS
+
+    # The regression that motivated the retune: the old guess had p_r and
+    # E_iso_wing OUTSIDE their own bounds, silently clipping every walker onto
+    # the boundary. The guess must lie strictly inside the box.
+    for p in driver.make_param_defs(True, True):
+        v = driver.INITIAL_GUESS[p.name]
+        assert p.lower <= v <= p.upper, (p.name, v, p.lower, p.upper)
 
     args = driver.parse_args([])
     assert (args.include_flare, args.include_wing, args.use_spectral_index) == (True, True, True)

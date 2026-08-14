@@ -20,7 +20,7 @@ os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from grb.const import D_L, HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, REDSHIFT, XRT_FLARE_START_TIME
 from grb.io import read_data
 from early_phase_plotting import plot_best_fit, plot_spectral_index_comparison
-from grb.params import ParamDefWithPrior
+from grb.prior import ParamDefWithPrior
 from grb.plotting import plot_corner
 from grb.spectral_index import (
     compute_break_frequencies,

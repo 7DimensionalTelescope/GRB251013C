@@ -1,0 +1,40 @@
+step 100: best -19.4
+step 200: best -19.2
+step 300: best -19.2
+step 400: best -19.2
+step 500: best -19.2
+step 600: best -19.2
+step 700: best -19.2
+step 800: best -19.2
+
+best logL(XRT+SI) = -19.18; 41600 samples within 8
+
+SC (low eps_B, slow cooling): 16629 samples, best -21.7
+  E_iso_core    6.91e+51 .. 8.82e+53 (med 2.65e+52)
+  Gamma0_core   107 .. 326 (med 155)
+  theta_c_core  0.198 .. 0.771 (med 0.467)
+  n_ism         2.97 .. 189 (med 32.5)
+  p             2.14 .. 2.61 (med 2.37)
+  eps_e         0.0328 .. 0.14 (med 0.0719)
+  eps_B         5.09e-07 .. 0.000263 (med 1.95e-05)
+  xi            0.16 .. 0.98 (med 0.72)
+
+HP (hard p<2): 17389 samples, best -19.2
+  E_iso_core    2.83e+51 .. 2.92e+52 (med 6.82e+51)
+  Gamma0_core   158 .. 1.47e+03 (med 417)
+  theta_c_core  0.237 .. 0.76 (med 0.444)
+  n_ism         19.3 .. 551 (med 131)
+  p             1.63 .. 1.86 (med 1.73)
+  eps_e         0.0199 .. 0.169 (med 0.072)
+  eps_B         0.00609 .. 0.198 (med 0.067)
+  xi            0.15 .. 0.77 (med 0.46)
+
+MID (p>2, mid eps_B): 7582 samples, best -21.8
+  E_iso_core    4.48e+51 .. 2.73e+52 (med 7.94e+51)
+  Gamma0_core   168 .. 396 (med 272)
+  theta_c_core  0.242 .. 0.768 (med 0.442)
+  n_ism         1.93 .. 122 (med 7.43)
+  p             2.03 .. 2.30 (med 2.15)
+  eps_e         0.0282 .. 0.117 (med 0.083)
+  eps_B         0.000329 .. 0.00198 (med 0.000585)
+  xi            0.11 .. 0.89 (med 0.25)

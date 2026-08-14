@@ -1,0 +1,76 @@
+seed INC: logP = -430.18
+seed HYB_A: logP = -793.25
+step 100: best -442.0 | th_c med 0.680 | p_wing med 2.56
+step 200: best -433.3 | th_c med 0.679 | p_wing med 2.56
+step 300: best -432.2 | th_c med 0.652 | p_wing med 2.57
+step 400: best -431.7 | th_c med 0.655 | p_wing med 2.59
+step 500: best -427.4 | th_c med 0.647 | p_wing med 2.65
+step 600: best -427.4 | th_c med 0.629 | p_wing med 2.68
+step 700: best -426.4 | th_c med 0.628 | p_wing med 2.66
+step 800: best -426.4 | th_c med 0.634 | p_wing med 2.68
+step 900: best -426.1 | th_c med 0.604 | p_wing med 2.68
+step 1000: best -421.4 | th_c med 0.535 | p_wing med 2.72
+step 1100: best -421.4 | th_c med 0.534 | p_wing med 2.70
+step 1200: best -421.4 | th_c med 0.511 | p_wing med 2.69
+step 1300: best -421.4 | th_c med 0.519 | p_wing med 2.68
+step 1400: best -420.7 | th_c med 0.530 | p_wing med 2.72
+step 1500: best -420.4 | th_c med 0.529 | p_wing med 2.76
+step 1600: best -420.4 | th_c med 0.538 | p_wing med 2.79
+step 1700: best -420.4 | th_c med 0.541 | p_wing med 2.78
+step 1800: best -420.4 | th_c med 0.509 | p_wing med 2.77
+step 1900: best -420.4 | th_c med 0.496 | p_wing med 2.86
+step 2000: best -420.4 | th_c med 0.488 | p_wing med 2.87
+step 2100: best -420.4 | th_c med 0.488 | p_wing med 2.87
+step 2200: best -419.0 | th_c med 0.473 | p_wing med 2.91
+step 2300: best -419.0 | th_c med 0.476 | p_wing med 2.93
+step 2400: best -419.0 | th_c med 0.482 | p_wing med 2.90
+
+BEST logP = -418.99  (narrow-box wing -430.2; no-wing wide-box -793.3)
+no-wing baseline (E_iso_wing<10^50.5): best -740.10 (17 samples)
+wing-active (E_iso_wing>10^51): best -418.99 (151730 samples)
+log10_E_iso_core           51.8324   6.79858e+51
+log10_Gamma0_core           2.6960       496.563
+log10_theta_c_core         -1.0304      0.093244
+log10_n_ism                 2.8883        773.22
+p                           2.1225       2.12253
+log10_eps_e                -1.1213     0.0756387
+log10_eps_B                -2.5348    0.00291886
+xi                          0.9211      0.921094
+log10_tau                   1.3530       22.5429
+p_r                         2.6698       2.66976
+log10_eps_e_r              -1.6833     0.0207354
+log10_eps_B_r              -0.7995      0.158662
+xi_r                        0.9567      0.956738
+log10_A_V                  -0.7394      0.182238
+log10_t_start_flare         3.3996       2509.53
+log10_tau_rise_flare        2.0625        115.48
+log10_tau_decay_flare       3.2775       1894.56
+log10_A_flare              -8.8764   1.32933e-09
+flare_beta                  0.6444      0.644411
+log10_E_iso_wing           52.2404   1.73943e+52
+log10_Gamma0_wing           1.1627       14.5435
+log10_theta_c_wing         -0.1568      0.697023
+p_wing                      3.4708        3.4708
+log10_eps_e_wing           -0.6538      0.221944
+log10_eps_B_wing           -2.6268    0.00236133
+xi_wing                     0.9949      0.994938
+
+within 6 of best (all): 7054 samples
+  log10_theta_c_core       16/50/84%: -1.072 -1.035 -1.010
+  p                        16/50/84%: 2.107 2.129 2.149
+  p_wing                   16/50/84%: 3.378 3.454 3.482
+  log10_theta_c_wing       16/50/84%: -0.201 -0.175 -0.135
+  log10_Gamma0_wing        16/50/84%: 1.156 1.165 1.172
+  log10_E_iso_wing         16/50/84%: 52.241 52.254 52.274
+  log10_eps_B_wing         16/50/84%: -2.647 -2.638 -2.622
+  log10_n_ism              16/50/84%: 2.845 2.878 2.951
+
+within 6 AND wing-active: 7054 samples
+  log10_theta_c_core       16/50/84%: -1.072 -1.035 -1.010
+  p                        16/50/84%: 2.107 2.129 2.149
+  p_wing                   16/50/84%: 3.378 3.454 3.482
+  log10_theta_c_wing       16/50/84%: -0.201 -0.175 -0.135
+  log10_Gamma0_wing        16/50/84%: 1.156 1.165 1.172
+  log10_E_iso_wing         16/50/84%: 52.241 52.254 52.274
+  log10_eps_B_wing         16/50/84%: -2.647 -2.638 -2.622
+  log10_n_ism              16/50/84%: 2.845 2.878 2.951

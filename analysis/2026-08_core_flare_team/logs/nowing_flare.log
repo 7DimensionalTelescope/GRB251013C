@@ -1,0 +1,38 @@
+step 100: best -1173.7
+step 200: best -972.5
+step 300: best -878.2
+step 400: best -837.8
+step 500: best -820.9
+step 600: best -813.0
+step 700: best -809.7
+step 800: best -793.3
+
+BEST logP = -793.32  (fast no-wing MID was -1272; incumbent wing -430.2)
+log10_E_iso_core           52.0334   1.07999e+52
+log10_Gamma0_core           2.1320       135.518
+log10_theta_c_core         -0.1192      0.760002
+log10_n_ism                 2.1263       133.739
+p                           2.1209       2.12093
+log10_eps_e                -1.4710     0.0338028
+log10_eps_B                -1.5230     0.0299909
+xi                          0.3116      0.311558
+log10_tau                   1.6672        46.473
+p_r                         2.7705       2.77048
+log10_eps_e_r              -0.9651      0.108367
+log10_eps_B_r              -0.2774      0.527937
+xi_r                        0.8818      0.881841
+log10_A_V                  -1.4455     0.0358495
+log10_t_start_flare         3.3195       2086.69
+log10_tau_rise_flare        1.9940       98.6177
+log10_tau_decay_flare       3.8720       7446.76
+log10_A_flare              -9.3262   4.71891e-10
+flare_beta                  0.6832      0.683249
+
+22 samples within 6:
+  p                        16/50/84%: 2.121 2.123 2.124
+  log10_theta_c_core       16/50/84%: -0.120 -0.114 -0.109
+  log10_eps_B              16/50/84%: -1.525 -1.508 -1.507
+  log10_t_start_flare      16/50/84%: 3.319 3.323 3.323
+  log10_tau_decay_flare    16/50/84%: 3.871 3.871 3.872
+  flare_beta               16/50/84%: 0.683 0.687 0.689
+  log10_A_flare            16/50/84%: -9.349 -9.340 -9.326

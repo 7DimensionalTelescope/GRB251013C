@@ -1,0 +1,45 @@
+seed FLARE-X: logP = -793.32
+seed NP766: logP = -766.68
+seed WW-core: logP = -35173.87
+step 200: best -767.4
+step 400: best -766.0
+step 600: best -766.0
+step 800: best -766.0
+step 1000: best -764.3
+step 1200: best -764.2
+step 1400: best -762.4
+step 1600: best -761.3
+step 1800: best -761.3
+step 2000: best -759.7
+step 2200: best -757.3
+step 2400: best -757.3
+
+BEST no-wing (matched box/steps) logP = -757.27
+(wing matched run best: -418.99; accidental in-run baseline was -740.1; FLARE-X -793.3)
+log10_E_iso_core           52.1768    1.5025e+52
+log10_Gamma0_core           2.1971        157.45
+log10_theta_c_core         -0.5028      0.314165
+log10_n_ism                 1.2981       19.8633
+p                           2.2163       2.21625
+log10_eps_e                -1.6995     0.0199751
+log10_eps_B                -1.0892     0.0814289
+xi                          0.2841      0.284113
+log10_tau                   1.7003       50.1504
+p_r                         3.4821       3.48214
+log10_eps_e_r              -0.6644      0.216593
+log10_eps_B_r              -0.4165      0.383255
+xi_r                        0.6616      0.661586
+log10_A_V                  -1.4851     0.0327252
+log10_t_start_flare         3.3475       2226.08
+log10_tau_rise_flare        1.2800       19.0525
+log10_tau_decay_flare       3.8699       7410.81
+log10_A_flare              -9.3813   4.15611e-10
+flare_beta                  0.6807      0.680659
+
+2703 samples within 6:
+  log10_theta_c_core       16/50/84%: -0.548 -0.479 -0.424
+  p                        16/50/84%: 2.170 2.188 2.224
+  log10_n_ism              16/50/84%: 1.289 1.597 1.814
+  log10_eps_B              16/50/84%: -1.387 -1.228 -1.075
+  log10_tau_decay_flare    16/50/84%: 3.869 3.875 3.886
+  flare_beta               16/50/84%: 0.675 0.687 0.701

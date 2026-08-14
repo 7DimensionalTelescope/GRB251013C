@@ -1,0 +1,17 @@
+7 seeds; control XRT+SI logL = -62.64
+[done] HP_wide2: -26.8 -> -23.3 (8000 evals)
+[done] SC_wide: -112.4 -> -23.2 (8000 evals)
+[done] SC_lown: -271.7 -> -23.6 (8000 evals)
+[done] SC_lowB: -294.1 -> -24.4 (8000 evals)
+[done] HP_narrow: -46.2 -> -19.3 (8000 evals)
+[done] HP_wide: -35.6 -> -19.4 (8000 evals)
+[done] control: -62.6 -> -21.5 (8000 evals)
+
+seed        logL(X+SI)  details
+HP_narrow        -19.3  XRTchi2=32.4 SIchi2=6.1 late_resid=['+0.3', '+0.5'] lateGamma=[1.88 1.86] p=1.69 eB=0.088 n=188 th=0.419
+HP_wide          -19.4  XRTchi2=32.6 SIchi2=6.2 late_resid=['+0.3', '+0.1'] lateGamma=[1.88 1.87] p=1.71 eB=0.087 n=207 th=0.500
+control          -21.5  XRTchi2=34.9 SIchi2=8.1 late_resid=['+0.3', '+0.2'] lateGamma=[2.03 2.02] p=2.17 eB=0.00087 n=5.06 th=0.451
+SC_wide          -23.2  XRTchi2=37.8 SIchi2=8.6 late_resid=['+1.5', '+1.1'] lateGamma=[1.97 1.97] p=2.38 eB=8.8e-06 n=73.5 th=0.462
+HP_wide2         -23.3  XRTchi2=38.5 SIchi2=8.2 late_resid=['-1.0', '+0.5'] lateGamma=[1.91 1.9 ] p=1.73 eB=0.1 n=4.38 th=0.193
+SC_lown          -23.6  XRTchi2=37.8 SIchi2=9.4 late_resid=['+1.5', '+1.2'] lateGamma=[2.01 2.  ] p=2.47 eB=5.1e-05 n=1.62 th=0.267
+SC_lowB          -24.4  XRTchi2=39.0 SIchi2=9.8 late_resid=['+1.8', '+1.4'] lateGamma=[1.95 1.93] p=2.57 eB=1e-06 n=13.5 th=0.264

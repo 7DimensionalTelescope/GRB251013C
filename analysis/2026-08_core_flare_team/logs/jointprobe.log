@@ -1,0 +1,42 @@
+step 50: best -521.9 | cur max -521.9 | walkers p<2:33 2-2.3:29 >2.3:2
+step 100: best -513.8 | cur max -513.8 | walkers p<2:33 2-2.3:31 >2.3:0
+step 150: best -444.5 | cur max -444.5 | walkers p<2:33 2-2.3:31 >2.3:0
+step 200: best -444.5 | cur max -445.2 | walkers p<2:33 2-2.3:31 >2.3:0
+step 250: best -438.3 | cur max -439.1 | walkers p<2:32 2-2.3:32 >2.3:0
+step 300: best -437.2 | cur max -437.2 | walkers p<2:32 2-2.3:32 >2.3:0
+step 350: best -437.1 | cur max -442.2 | walkers p<2:32 2-2.3:32 >2.3:0
+step 400: best -437.1 | cur max -442.2 | walkers p<2:32 2-2.3:32 >2.3:0
+step 450: best -437.1 | cur max -443.1 | walkers p<2:32 2-2.3:32 >2.3:0
+step 500: best -437.1 | cur max -440.7 | walkers p<2:32 2-2.3:32 >2.3:0
+step 550: best -436.8 | cur max -437.1 | walkers p<2:31 2-2.3:33 >2.3:0
+step 600: best -436.5 | cur max -436.5 | walkers p<2:31 2-2.3:33 >2.3:0
+step 650: best -436.5 | cur max -437.1 | walkers p<2:31 2-2.3:33 >2.3:0
+step 700: best -436.5 | cur max -439.4 | walkers p<2:31 2-2.3:33 >2.3:0
+
+BEST logP = -436.52  (incumbent -436.65)
+log10_E_iso_core           51.8627   7.28956e+51
+log10_Gamma0_core           2.5802       380.386
+log10_theta_c_core         -0.9771      0.105403
+log10_n_ism                 2.6612       458.346
+p                           2.1455       2.14546
+log10_eps_e                -1.2054     0.0623134
+log10_eps_B                -2.3654    0.00431079
+xi                          0.8949       0.89486
+log10_tau                   1.3098       20.4082
+p_r                         2.9225       2.92247
+log10_eps_e_r              -1.4172     0.0382614
+log10_eps_B_r              -0.6302      0.234297
+xi_r                        0.9910      0.991043
+log10_A_V                  -0.6233      0.238066
+log10_t_start_flare         3.4029       2528.62
+log10_tau_rise_flare        1.9149       82.1989
+log10_tau_decay_flare       3.2771       1892.82
+log10_A_flare              -8.9144   1.21795e-09
+flare_beta                  0.6454      0.645361
+log10_E_iso_wing           52.1138   1.29963e+52
+log10_Gamma0_wing           1.1753       14.9728
+log10_theta_c_wing         -0.1547      0.700265
+p_wing                      3.2433       3.24326
+log10_eps_e_wing           -0.4759      0.334294
+log10_eps_B_wing           -2.4687    0.00339893
+xi_wing                     0.9902      0.990226

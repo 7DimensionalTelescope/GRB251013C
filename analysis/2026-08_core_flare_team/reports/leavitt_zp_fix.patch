@@ -1,0 +1,30 @@
+--- a/grb/utils.py
++++ b/grb/utils.py
+@@ def mag_to_flux_mJy(df):
+     mag = df["magnitude"].to_numpy(float) if "magnitude" in df.columns else df["Mag"].to_numpy(float)
+     mag_err = df["mag_error"].to_numpy(float) if "mag_error" in df.columns else df["Error"].to_numpy(float)
+
++    # Per-band zero point: FILTER_INFO declares Rc/Ic (and V) as Vega-system
++    # photometry (GCN 42333: Lupton-2005 conversion => Vega by construction).
++    # Using the AB ZP (3631 Jy) for them over-brightens Rc by 0.179 mag and
++    # Ic by 0.384 mag, which was the dominant term in the Leavitt chi2.
++    filters = df["filter"].tolist() if "filter" in df.columns else [None] * len(mag)
++
+     if "wavelength" in df.columns:
+         wavelengths = df["wavelength"].to_numpy(float)
+         bandwidths = df["filter_width"].to_numpy(float)
+         unit = "AA"
+         flx_list, flx_err_list = [], []
+-        for m, e in zip(mag, mag_err):
+-            f, fe = _mag_to_flux_mJy(m, e)
++        for m, e, filt in zip(mag, mag_err, filters):
++            info = FILTER_INFO.get(filt) if filt is not None else None
++            if info is not None and info.get("system") == "Vega":
++                zp = info.get("vega_zero_point_jy", 3631)
++            else:
++                zp = 3631
++            f, fe = _mag_to_flux_mJy(m, e, zero_point=zp)
+             flx_list.append(f)
+             flx_err_list.append(fe)
+     else:
+         raise ValueError("wavelength column not found")

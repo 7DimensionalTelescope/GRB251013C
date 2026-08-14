@@ -1,0 +1,46 @@
+28 starts
+branchA baseline target = -577.57
+
+branchA_best                   target=   -548.03
+branchB_p2.6_eB0.001_n100      target=   -588.76
+branchB_p2.8_eB0.001_n100      target=   -599.23
+branchB_p2.4_eB0.001_n100      target=   -649.10
+branchB_p2.6_eB0.0001_n100     target=   -665.50
+branchB_p2.6_eB1e-05_n100      target=   -673.28
+branchB_p2.4_eB0.0001_n100     target=   -701.96
+branchB_p2.8_eB1e-05_n100      target=   -715.75
+branchB_p2.8_eB0.0001_n100     target=   -748.63
+branchB_p2.4_eB1e-05_n100      target=   -779.56
+branchB_p2.8_eB0.0001_n10      target=   -871.43
+branchB_p2.4_eB0.0001_n1       target=   -884.87
+branchB_p2.6_eB0.0001_n10      target=   -895.20
+branchB_p2.6_eB0.0001_n1       target=   -922.91
+
+=== BEST branchA_best  target=-548.03 ===
+label                      sampled      physical
+log10_E_iso_core           52.0506    1.1236e+52
+log10_Gamma0_core           2.7415        551.47
+log10_theta_c_core         -1.4078      0.039102
+log10_n_ism                 2.1671        146.94
+p                           2.1645        2.1645
+log10_eps_e                -1.3804      0.041649
+log10_eps_B                -2.2497      0.005627
+xi                          0.8972       0.89719
+log10_tau                   1.1071        12.797
+p_r                         2.3008        2.3008
+log10_eps_e_r              -1.2914      0.051125
+log10_eps_B_r              -0.7912       0.16173
+xi_r                        0.8520       0.85203
+log10_A_V                  -0.6236        0.2379
+log10_t_start_flare         3.4071        2553.5
+log10_tau_rise_flare        1.4066        25.505
+log10_tau_decay_flare       3.3786        2391.1
+log10_A_flare              -9.0168    9.6213e-10
+flare_beta                  0.6382        0.6382
+log10_E_iso_wing           52.0049    1.0113e+52
+log10_Gamma0_wing           1.2843        19.246
+log10_theta_c_wing         -0.3084       0.49164
+p_wing                      3.0557        3.0557
+log10_eps_e_wing           -0.5192       0.30257
+log10_eps_B_wing           -1.9157      0.012143
+xi_wing                     1.0000       0.99996

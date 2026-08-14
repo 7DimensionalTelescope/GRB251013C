@@ -1,0 +1,55 @@
+Loading ALL data (XRT + all optical bands)...
+
+Data loaded:
+  XRT: 45 points (0.13-112.8 hr)
+  i-band: 67 points (0.03-3.0 hr)
+  Leavitt_Rc: 35 points (1.63-4.6 hr)
+  Leavitt_Ic: 18 points (2.81-4.8 hr)
+  7DT_g: 1 points (6.41-6.4 hr)
+  7DT_r: 1 points (6.53-6.5 hr)
+  7DT_i: 1 points (6.41-6.4 hr)
+  7DT_m400: 1 points (6.52-6.5 hr)
+  7DT_m425: 1 points (6.53-6.5 hr)
+  7DT_m450: 1 points (6.41-6.4 hr)
+  7DT_m475: 1 points (6.52-6.5 hr)
+  7DT_m500: 1 points (6.54-6.5 hr)
+  7DT_m525: 1 points (6.52-6.5 hr)
+  7DT_m550: 1 points (6.53-6.5 hr)
+  7DT_m575: 1 points (6.41-6.4 hr)
+  7DT_m600: 1 points (6.41-6.4 hr)
+  7DT_m625: 1 points (6.41-6.4 hr)
+  7DT_m650: 1 points (6.41-6.4 hr)
+  7DT_m675: 1 points (6.53-6.5 hr)
+  7DT_m700: 1 points (6.41-6.4 hr)
+  7DT_m750: 1 points (6.47-6.5 hr)
+  7DT_m775: 1 points (6.52-6.5 hr)
+  7DT_m800: 1 points (6.41-6.4 hr)
+  7DT_m825: 1 points (6.53-6.5 hr)
+  7DT_m850: 1 points (6.41-6.4 hr)
+  7DT_m875: 1 points (6.47-6.5 hr)
+
+Total: 45 XRT + 142 optical = 187 points
+Include flare: True
+Include wing: True
+XRT spectral index: 45 points (applied where core+wing dominate XRT, flare < 50%)
+
+Parameters: 26
+Walkers: 52
+Steps: 20
+
+Running MCMC...
+Using 12 CPU cores (out of 72 available)
+  0%|          | 0/20 [00:00<?, ?it/s]  5%|▌         | 1/20 [00:05<01:39,  5.26s/it] 10%|█         | 2/20 [00:10<01:33,  5.18s/it] 15%|█▌        | 3/20 [00:16<01:31,  5.40s/it] 20%|██        | 4/20 [00:22<01:32,  5.76s/it] 25%|██▌       | 5/20 [00:29<01:31,  6.12s/it] 30%|███       | 6/20 [00:35<01:26,  6.19s/it] 35%|███▌      | 7/20 [00:41<01:21,  6.28s/it] 40%|████      | 8/20 [00:48<01:16,  6.33s/it] 45%|████▌     | 9/20 [00:55<01:13,  6.70s/it] 50%|█████     | 10/20 [01:02<01:07,  6.75s/it] 55%|█████▌    | 11/20 [01:09<01:00,  6.68s/it] 60%|██████    | 12/20 [01:16<00:55,  6.89s/it] 65%|██████▌   | 13/20 [01:23<00:47,  6.76s/it] 70%|███████   | 14/20 [01:30<00:41,  6.92s/it] 75%|███████▌  | 15/20 [01:37<00:34,  6.94s/it] 80%|████████  | 16/20 [01:44<00:28,  7.06s/it] 85%|████████▌ | 17/20 [01:50<00:20,  6.77s/it] 90%|█████████ | 18/20 [01:56<00:12,  6.31s/it] 95%|█████████▌| 19/20 [02:00<00:05,  5.82s/it]100%|██████████| 20/20 [02:02<00:00,  4.75s/it]100%|██████████| 20/20 [02:02<00:00,  6.15s/it]
+
+Best log probability: -561.629
+Results saved to: /data/dtak/research/grb/GRB251013C/.claude/worktrees/fit-bounds-retune/modeling/fit_results/final_flare_wing_20260730_131500
+
+Plotting best-fit light curves...
+  ✓ Saved: /data/dtak/research/grb/GRB251013C/.claude/worktrees/fit-bounds-retune/modeling/fit_results/final_flare_wing_20260730_131500/bestfit_lc.png
+Plotting spectral index comparison...
+  ✓ Saved: /data/dtak/research/grb/GRB251013C/.claude/worktrees/fit-bounds-retune/modeling/fit_results/final_flare_wing_20260730_131500/spectral_index_comparison.png
+Corner plot saved to: /data/dtak/research/grb/GRB251013C/.claude/worktrees/fit-bounds-retune/modeling/fit_results/final_flare_wing_20260730_131500/corner_plot.png
+
+============================================================
+✓ All done!
+============================================================

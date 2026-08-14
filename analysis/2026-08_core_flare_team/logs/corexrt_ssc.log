@@ -1,0 +1,15 @@
+6 seeds (SSC core); sync-only core best was -19.3
+[done] S2: -97.2 -> -28.9 (8000 evals)
+[done] S1: -94.8 -> -29.5 (8000 evals)
+[done] S3: -89.5 -> -29.1 (8000 evals)
+[done] ctrl_ssc: -174.6 -> -25.7 (8000 evals)
+[done] S5: -94.6 -> -30.8 (8000 evals)
+[done] S4: -118.6 -> -29.6 (8000 evals)
+
+seed      logL(X+SI)  details
+ctrl_ssc       -25.7  XRTchi2=31.6 SIchi2=19.7 late=['-0.0', '-0.0'] lateG=[2.05 2.03] i5=137uJy p=2.04 eB=0.0077 n=1 th=0.19 E=2.5e+52
+S2             -28.9  XRTchi2=38.7 SIchi2=19.1 late=['+0.4', '+0.1'] lateG=[2.08 2.06] i5=119uJy p=2.10 eB=4.8e-05 n=4.1 th=0.22 E=1.3e+53
+S3             -29.1  XRTchi2=32.1 SIchi2=26.0 late=['-0.5', '-0.0'] lateG=[2.05 2.03] i5=206uJy p=2.05 eB=0.00017 n=13.4 th=0.19 E=1.3e+53
+S1             -29.5  XRTchi2=31.4 SIchi2=27.5 late=['+0.1', '-0.1'] lateG=[2.03 2.01] i5=210uJy p=2.04 eB=0.00016 n=82.7 th=0.27 E=1.6e+53
+S4             -29.6  XRTchi2=31.6 SIchi2=27.5 late=['+0.2', '-0.0'] lateG=[2.01 1.99] i5=200uJy p=2.04 eB=2.6e-05 n=127 th=0.25 E=3.8e+53
+S5             -30.8  XRTchi2=31.7 SIchi2=29.9 late=['+0.4', '-0.0'] lateG=[2.   1.99] i5=203uJy p=2.05 eB=9.4e-05 n=201 th=0.35 E=1.5e+53

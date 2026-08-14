@@ -1,0 +1,88 @@
+cases: HP SC MID; incumbent joint logP = -430.18
+[done] MID: -59319.5 -> -1856.4  (6000 evals, 2072s)
+[done] SC: -433960.6 -> -3507.3  (6000 evals, 2211s)
+[done] HP: -3075.7 -> -1864.0  (6000 evals, 2417s)
+
+=== MID: logP = -1856.38 ===
+  log10_E_iso_core            7.8287e+51
+  log10_Gamma0_core               225.05
+  log10_theta_c_core             0.45603
+  log10_n_ism                     4.9244
+  p                                2.208
+  log10_eps_e                   0.071018
+  log10_eps_B                 0.00073784
+  xi                             0.10124
+  log10_tau                       19.339
+  p_r                             2.6622
+  log10_eps_e_r                 0.022901
+  log10_eps_B_r                  0.16714
+  xi_r                           0.97893
+  log10_A_V                      0.08494
+  log10_t_start_flare             1441.2
+  log10_tau_rise_flare              2000
+  log10_tau_decay_flare           6425.1
+  log10_A_flare               2.1562e-09
+  flare_beta                     0.54752
+  log10_E_iso_wing            1.1737e+52
+  log10_Gamma0_wing                  100
+  log10_theta_c_wing             0.72665
+  p_wing                             3.3
+  log10_eps_e_wing              0.032778
+  log10_eps_B_wing              0.099275
+  xi_wing                              1
+
+=== HP: logP = -1863.99 ===
+  log10_E_iso_core            5.6758e+51
+  log10_Gamma0_core                336.7
+  log10_theta_c_core             0.60115
+  log10_n_ism                     278.35
+  p                               1.6665
+  log10_eps_e                   0.089261
+  log10_eps_B                    0.10496
+  xi                             0.41782
+  log10_tau                       19.339
+  p_r                             2.6622
+  log10_eps_e_r                 0.022901
+  log10_eps_B_r                  0.16714
+  xi_r                           0.97893
+  log10_A_V                     0.083471
+  log10_t_start_flare             2590.1
+  log10_tau_rise_flare                 5
+  log10_tau_decay_flare           1787.6
+  log10_A_flare               1.2449e-09
+  flare_beta                     0.66694
+  log10_E_iso_wing             1.655e+52
+  log10_Gamma0_wing               14.529
+  log10_theta_c_wing             0.64694
+  p_wing                             3.3
+  log10_eps_e_wing               0.57211
+  log10_eps_B_wing             0.0031736
+  xi_wing                        0.99995
+
+=== SC: logP = -3507.33 ===
+  log10_E_iso_core            3.4039e+51
+  log10_Gamma0_core               265.61
+  log10_theta_c_core             0.46182
+  log10_n_ism                     58.937
+  p                               2.1234
+  log10_eps_e                    0.18418
+  log10_eps_B                 0.00029834
+  xi                             0.17048
+  log10_tau                       19.339
+  p_r                             2.6622
+  log10_eps_e_r                 0.022901
+  log10_eps_B_r                  0.16714
+  xi_r                           0.97893
+  log10_A_V                      0.18344
+  log10_t_start_flare             1455.4
+  log10_tau_rise_flare            1475.5
+  log10_tau_decay_flare           1557.2
+  log10_A_flare               5.4961e-10
+  flare_beta                       1.035
+  log10_E_iso_wing            1.6689e+52
+  log10_Gamma0_wing               16.972
+  log10_theta_c_wing             0.97534
+  p_wing                             3.3
+  log10_eps_e_wing               0.56028
+  log10_eps_B_wing             0.0070653
+  xi_wing                              1

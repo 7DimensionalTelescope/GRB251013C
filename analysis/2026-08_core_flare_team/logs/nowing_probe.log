@@ -1,0 +1,36 @@
+step 100: best -788.5
+step 200: best -783.8
+step 300: best -779.8
+step 400: best -775.5
+step 500: best -769.7
+step 600: best -769.2
+step 700: best -768.0
+step 800: best -766.7
+
+BEST logP = -766.68  (railed no-wing run was -790.8; wing best -436.7)
+log10_E_iso_core           52.1073   1.28017e+52
+log10_Gamma0_core           3.0439       1106.47
+log10_theta_c_core         -1.2367     0.0579797
+log10_n_ism                 1.2559       18.0281
+p                           2.6707       2.67068
+log10_eps_e                -1.3771     0.0419684
+log10_eps_B                -2.0996    0.00795039
+xi                          0.7107       0.71074
+log10_tau                   1.6597       45.6775
+p_r                         3.2207       3.22065
+log10_eps_e_r              -1.6819     0.0207995
+log10_eps_B_r              -0.9800      0.104717
+xi_r                        0.3652      0.365187
+log10_A_V                  -0.7905       0.16198
+log10_t_start_flare         3.3533       2256.03
+log10_tau_rise_flare        0.9777       9.49953
+log10_tau_decay_flare       3.9946       9876.49
+log10_A_flare              -9.4223    3.7816e-10
+flare_beta                  0.7094      0.709416
+
+1743 samples within 5:
+  p                      16/50/84%: 2.525 2.565 2.612
+  log10_theta_c_core     16/50/84%: -1.181 -1.128 -1.098
+  log10_n_ism            16/50/84%: 1.621 1.942 2.096
+  log10_eps_B            16/50/84%: -2.509 -2.377 -2.222
+  log10_tau_decay_flare  16/50/84%: 3.981 3.986 3.990

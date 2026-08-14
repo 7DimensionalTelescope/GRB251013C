@@ -1,0 +1,22 @@
+Baseline: a40dd204
+constants + utils
+  constants match final_model.py; seconds_from_trigger and model_array OK
+extinction
+  host_extinction_attenuation identical (SMC law, rest-frame)
+spectral index
+  spectral index identical (45 points), breaks and p prior identical
+params
+  make_param_defs match baseline except the 8 documented retuned bounds, for all 4 flare/wing combinations
+modeling
+  data identical: 45 XRT + 25 optical datasets (142 points); core and wing model flux identical
+likelihood
+  log_probability identical over 51 theta (51 finite); reference log_prob=-40459.052164414396
+results
+  top_k_samples/read_labels/latest_result_dir/load_best_fit_params identical (final_flare_wing_20260724_171919, 26 params)
+plotting
+  set_log_y_limits and compute_model_components identical (XRT and optical branches)
+  (skipping figure byte comparison; pass --png to run it)
+driver
+  driver CLI defaults, 26 labels and walker seeding match baseline
+
+All equivalence checks PASSED

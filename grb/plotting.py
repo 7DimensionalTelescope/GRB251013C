@@ -14,6 +14,7 @@ from .extinction import host_extinction_attenuation
 from .functions import norris_flare
 from .likelihood import spectral_index_model
 from .modeling import load_all_optical_data, make_core_model, make_wing_model
+from .params import dataset_cal_factor
 from .results import load_best_fit_params, read_labels
 from .spectral_index import compute_break_frequencies, load_xrt_spectral_index
 from .utils import model_array
@@ -157,8 +158,43 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
     }
 
 
-def plot_light_curves(outdir):
-    """Generate best-fit light curve plots with component contributions and 7DT spectrum"""
+def _sample_to_params(labels, theta):
+    """Convert a sampled vector to a physical-parameter dict using the labels."""
+    params = {}
+    for label, value in zip(labels, theta):
+        if label.startswith("log10_"):
+            params[label[len("log10_"):]] = 10 ** value
+        else:
+            params[label] = value
+    return params
+
+
+def _posterior_draws(outdir, n_draws, seed, discard_frac=0.5):
+    """Thin posterior draws from a run's flat chain (first discard_frac dropped as burn-in)."""
+    try:
+        samples = np.load(Path(outdir) / "samples.npy")
+        log_probs = np.load(Path(outdir) / "log_probs.npy")
+    except FileNotFoundError:
+        return None
+    samples = samples.reshape(-1, samples.shape[-1])
+    log_probs = log_probs.reshape(-1)
+    start = int(len(samples) * discard_frac)  # flat chain is step-major
+    samples, log_probs = samples[start:], log_probs[start:]
+    finite = np.isfinite(log_probs) & np.all(np.isfinite(samples), axis=1)
+    samples = samples[finite]
+    if len(samples) == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(samples), min(n_draws, len(samples)), replace=False)
+    return samples[idx]
+
+
+def plot_light_curves(outdir, band_draws=300, band_seed=42):
+    """Generate best-fit light curve plots with component contributions and 7DT spectrum.
+
+    band_draws > 0 adds a ~0.15-99.85% (3 sigma) posterior envelope of the total model
+    to each panel, computed from that many thinned post-burn-in posterior draws.
+    """
     outdir = Path(outdir)
 
     # Load best-fit parameters
@@ -180,6 +216,30 @@ def plot_light_curves(outdir):
     xrt_components = compute_model_components(params, t_grid, None, XRT_BAND,
                                               include_flare, include_wing)
 
+    # 0.15-99.85% (~3 sigma) posterior envelopes of the total model in each panel
+    draws = _posterior_draws(outdir, band_draws, band_seed) if band_draws else None
+    band_xrt = None
+    band_opt = {}
+    sample_labels = None
+    if draws is not None:
+        sample_labels = read_labels(outdir / "labels.txt")
+        lc_freqs = {d['name']: d['frequency'] for d in lc_data}
+        xrt_stack = []
+        opt_stack = {name: [] for name in lc_freqs}
+        for theta in draws:
+            dparams = _sample_to_params(sample_labels, theta)
+            comp = compute_model_components(dparams, t_grid, None, XRT_BAND,
+                                            include_flare, include_wing)
+            xrt_stack.append(comp['total'])
+            for name, nu in lc_freqs.items():
+                comp = compute_model_components(dparams, t_grid, nu, None,
+                                                include_flare, include_wing)
+                cal = dataset_cal_factor(dparams, name)
+                opt_stack[name].append(comp['total'] * cal)
+        band_xrt = np.percentile(xrt_stack, [0.15, 99.85], axis=0)
+        band_opt = {name: np.percentile(stack, [0.15, 99.85], axis=0)
+                    for name, stack in opt_stack.items()}
+
     # Create 3-panel figure
     fig = plt.figure(figsize=(16, 4.5))
     gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.9])
@@ -194,13 +254,16 @@ def plot_light_curves(outdir):
 
     # Plot components
     t_grid_hr = t_grid / 3600
-    ax_xrt.plot(t_grid_hr, xrt_components['total'], 'k-', lw=2, label='Total')
-    ax_xrt.plot(t_grid_hr, xrt_components['core_fs'], 'k:', lw=1.5, label='Core FS')
-    ax_xrt.plot(t_grid_hr, xrt_components['core_rs'], 'c-.', lw=1.5, label='Reverse Shock')
+    if band_xrt is not None:
+        ax_xrt.fill_between(t_grid_hr, band_xrt[0], band_xrt[1], color='black',
+                            alpha=0.25, lw=0, zorder=1, label=r'3$\sigma$ posterior')
+    ax_xrt.plot(t_grid_hr, xrt_components['total'], 'k-', lw=1.2, label='Total', zorder=3)
+    ax_xrt.plot(t_grid_hr, xrt_components['core_fs'], 'k:', lw=1.2, label='Core FS')
+    ax_xrt.plot(t_grid_hr, xrt_components['core_rs'], 'c-.', lw=1.2, label='Reverse Shock')
     if include_wing:
-        ax_xrt.plot(t_grid_hr, xrt_components['wing'], 'b--', lw=1.5, label='Wing')
+        ax_xrt.plot(t_grid_hr, xrt_components['wing'], 'b--', lw=1.2, label='Wing')
     if include_flare and np.any(xrt_components['flare'] > 0):
-        ax_xrt.plot(t_grid_hr, xrt_components['flare'], color='red', ls=(0, (5, 1)), lw=1.5, alpha=0.7, label='Flare')
+        ax_xrt.plot(t_grid_hr, xrt_components['flare'], color='red', ls=(0, (5, 1)), lw=1.2, alpha=0.7, label='Flare')
 
     ax_xrt.set_xlabel('Time since trigger [hr]', fontsize=11)
     ax_xrt.set_ylabel(r'Flux [erg cm$^{-2}$ s$^{-1}$]', fontsize=11)
@@ -248,19 +311,25 @@ def plot_light_curves(outdir):
         color = colors[dataset['name']]
         offset = offset_factors.get(dataset['name'], 1.0)
         nu = dataset['frequency']
+        cal = dataset_cal_factor(params, dataset['name'])
 
         # Compute components
         opt_components = compute_model_components(params, t_grid, nu, None,
                                                   include_flare, include_wing)
 
-        # Apply same offset factor to model
-        ax_opt.plot(t_grid_hr, opt_components['total'] * offset, color=color, lw=2)
-        ax_opt.plot(t_grid_hr, opt_components['core_fs'] * offset, color=color, ls=':', lw=1.5, alpha=0.7)
-        ax_opt.plot(t_grid_hr, opt_components['core_rs'] * offset, color=color, ls='-.', lw=1.5, alpha=0.7)
+        # Apply same offset factor to model (and cal scale relative to 7DT)
+        scale = offset * cal
+        if dataset['name'] in band_opt:
+            lo, hi = band_opt[dataset['name']]
+            ax_opt.fill_between(t_grid_hr, lo * offset, hi * offset, color=color,
+                                alpha=0.25, lw=0, zorder=1)
+        ax_opt.plot(t_grid_hr, opt_components['total'] * scale, color=color, lw=1.2, zorder=3)
+        ax_opt.plot(t_grid_hr, opt_components['core_fs'] * scale, color=color, ls=':', lw=1.2, alpha=0.7)
+        ax_opt.plot(t_grid_hr, opt_components['core_rs'] * scale, color=color, ls='-.', lw=1.2, alpha=0.7)
         if include_wing and np.any(opt_components['wing'] > 0):
-            ax_opt.plot(t_grid_hr, opt_components['wing'] * offset, color=color, ls='--', lw=1.5, alpha=0.7)
+            ax_opt.plot(t_grid_hr, opt_components['wing'] * scale, color=color, ls='--', lw=1.2, alpha=0.7)
         if include_flare and np.any(opt_components['flare'] > 0):
-            ax_opt.plot(t_grid_hr, opt_components['flare'] * offset, color=color, ls=(0, (5, 1)), lw=1.5, alpha=0.7)
+            ax_opt.plot(t_grid_hr, opt_components['flare'] * scale, color=color, ls=(0, (5, 1)), lw=1.2, alpha=0.7)
 
     ax_opt.set_xlabel('Time since trigger [hr]', fontsize=11)
     ax_opt.set_ylabel('Flux density [mJy]', fontsize=11)
@@ -311,19 +380,29 @@ def plot_light_curves(outdir):
         rs_sed = np.array([comp['core_rs'][0] for comp in sed_components_list])
         wing_sed = np.array([comp['wing'][0] for comp in sed_components_list])
 
+        if draws is not None:
+            sed_times = np.full_like(nu_grid, sed_time)
+            sed_stack = [compute_model_components(_sample_to_params(sample_labels, theta),
+                                                  sed_times, nu_grid, None,
+                                                  include_flare, include_wing)['total']
+                         for theta in draws]
+            sed_band = np.percentile(sed_stack, [0.15, 99.85], axis=0)
+            ax_sed.fill_between(wavelength_grid, sed_band[0], sed_band[1], color='black',
+                                alpha=0.25, lw=0, zorder=1, label=r'3$\sigma$ posterior')
+
         # Plot 7DT data and model (with all components)
         ax_sed.errorbar(sdt_wavelength, sdt_flux, yerr=sdt_flux_err,
                        fmt='.', color='slategray', alpha=0.8, markersize=6, label='7DT data', zorder=5)
-        ax_sed.plot(wavelength_grid, total_sed, 'k-', lw=2, label=f'Total at {sed_time/3600:.2f} hr', zorder=4)
-        ax_sed.plot(wavelength_grid, fs_sed, 'k:', lw=1.5, label='Core FS', zorder=3)
-        ax_sed.plot(wavelength_grid, rs_sed, 'c-.', lw=1.5, label='Reverse Shock', zorder=3)
+        ax_sed.plot(wavelength_grid, total_sed, 'k-', lw=1.2, label=f'Total at {sed_time/3600:.2f} hr', zorder=4)
+        ax_sed.plot(wavelength_grid, fs_sed, 'k:', lw=1.2, label='Core FS', zorder=3)
+        ax_sed.plot(wavelength_grid, rs_sed, 'c-.', lw=1.2, label='Reverse Shock', zorder=3)
         if include_wing and np.any(wing_sed > 0):
-            ax_sed.plot(wavelength_grid, wing_sed, 'b--', lw=1.5, label='Wing', zorder=3)
+            ax_sed.plot(wavelength_grid, wing_sed, 'b--', lw=1.2, label='Wing', zorder=3)
         if include_flare:
             flare_sed = np.array([comp['flare'][0] for comp in sed_components_list])
             if np.any(flare_sed > 0):
                 ax_sed.plot(wavelength_grid, flare_sed, color='red', ls=(0, (5, 1)),
-                           lw=1.5, alpha=0.7, label='Flare', zorder=3)
+                           lw=1.2, alpha=0.7, label='Flare', zorder=3)
 
         ax_sed.set_xlabel(r'Wavelength [$\AA$]', fontsize=11)
         ax_sed.set_ylabel('Flux density [mJy]', fontsize=11)
@@ -334,12 +413,10 @@ def plot_light_curves(outdir):
         ax_sed.set_title('7DT Spectrum', fontsize=12, fontweight='bold')
 
         # Set y-axis limits for spectrum
-        set_log_y_limits(
-            ax_sed,
-            sdt_flux - sdt_flux_err,
-            sdt_flux + sdt_flux_err,
-            total_sed,
-        )
+        sed_ylim_args = [sdt_flux - sdt_flux_err, sdt_flux + sdt_flux_err, total_sed]
+        if draws is not None:
+            sed_ylim_args.extend([sed_band[0], sed_band[1]])
+        set_log_y_limits(ax_sed, *sed_ylim_args)
 
     fig.tight_layout()
 

@@ -1,0 +1,46 @@
+8 starts; control target at start = -474.78
+[done] control: start -474.78 -> -576.90 (361 evals)
+[done] p1.85_pw2.4: start -4461.00 -> -895.76 (1063 evals)
+[done] p1.85_pw1.9_hiEe: start -30062.25 -> -1685.95 (1712 evals)
+[done] pw2.4: start -2689.37 -> -786.11 (2571 evals)
+[done] p1.85: start -1535.92 -> -670.77 (3093 evals)
+[done] p1.85_pw1.9: start -31132.66 -> -1518.85 (3934 evals)
+[done] pw1.9: start -27504.46 -> -1309.80 (3623 evals)
+[done] p1.7_pw1.7: start -39214.37 -> -3034.57 (4076 evals)
+
+control            logP=  -576.90  p=1.893  p_wing=2.790  n=419  th_w=0.70
+p1.85              logP=  -670.77  p=1.829  p_wing=3.140  n=492  th_w=0.67
+pw2.4              logP=  -786.11  p=1.804  p_wing=2.458  n=581  th_w=0.79
+p1.85_pw2.4        logP=  -895.76  p=1.827  p_wing=2.408  n=634  th_w=0.82
+pw1.9              logP= -1309.80  p=1.820  p_wing=1.933  n=274  th_w=0.68
+p1.85_pw1.9        logP= -1518.85  p=1.767  p_wing=1.920  n=211  th_w=0.98
+p1.85_pw1.9_hiEe   logP= -1685.95  p=1.804  p_wing=1.915  n=271  th_w=0.95
+p1.7_pw1.7         logP= -3034.57  p=1.818  p_wing=1.916  n=19  th_w=0.36
+
+=== BEST control  logP=-576.90 ===
+log10_E_iso_core           51.7630    5.7939e+51
+log10_Gamma0_core           2.6282        424.83
+log10_theta_c_core         -1.1954      0.063771
+log10_n_ism                 2.6222        418.95
+p                           1.8931        1.8931
+log10_eps_e                -1.0000       0.09999
+log10_eps_B                -1.5652      0.027215
+xi                          0.8001       0.80006
+log10_tau                   1.3055        20.207
+p_r                         2.2721        2.2721
+log10_eps_e_r              -1.4249      0.037588
+log10_eps_B_r              -0.5778       0.26435
+xi_r                        0.7815       0.78149
+log10_A_V                  -0.6695       0.21402
+log10_t_start_flare         3.3742        2367.1
+log10_tau_rise_flare        1.9334         85.79
+log10_tau_decay_flare       3.3427        2201.2
+log10_A_flare              -8.9489     1.125e-09
+flare_beta                  0.6476       0.64763
+log10_E_iso_wing           52.1017     1.264e+52
+log10_Gamma0_wing           1.1790          15.1
+log10_theta_c_wing         -0.1543       0.70098
+p_wing                      2.7904        2.7904
+log10_eps_e_wing           -0.5153       0.30529
+log10_eps_B_wing           -2.3718     0.0042482
+xi_wing                     1.0000       0.99996

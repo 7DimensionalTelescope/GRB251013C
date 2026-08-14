@@ -1,0 +1,7 @@
+no-wing test: wide core frozen per branch; free RS+flare+A_V
+[done] HP: -41891.0 -> -1042.9 (9000 evals, 1550s)
+[done] MID: -59319.4 -> -1272.1 (9000 evals, 1615s)
+[done] SC: -436700.5 -> -3877.3 (9000 evals, 1979s)
+HP: logP = -1042.87
+MID: logP = -1272.08
+SC: logP = -3877.31

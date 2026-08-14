@@ -27,7 +27,7 @@ from VegasAfterglow import Scale
 from grb.const import FIT_RESULTS_DIR, SI_FLARE_FRAC_MAX
 from grb.likelihood import log_probability
 from grb.modeling import load_all_optical_data
-from grb.params import make_param_defs
+from grb.params import NON_7DT_CAL_DATASETS, cal_param_name, make_param_defs
 from grb.plotting import plot_corner, plot_light_curves, plot_spectral_index_comparison
 from grb.results import save_bestfit_params, save_run_arrays
 from grb.spectral_index import load_xrt_spectral_index
@@ -66,12 +66,20 @@ INITIAL_GUESS = {
     "eps_B_wing": 0.0121,
     "xi_wing": 0.98,  # optimum is at the physical limit 1.0; start just inside
 }
+# Cross-cal scales (7DT reference); only used when --include-cal
+for _name in NON_7DT_CAL_DATASETS:
+    INITIAL_GUESS[cal_param_name(_name)] = 1.0
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Final model: ALL data + Core + Wing + RS + Norris flare")
     parser.add_argument("--include-flare", default=True, action=argparse.BooleanOptionalAction)
-    parser.add_argument("--include-wing", default=True, action=argparse.BooleanOptionalAction)
+    parser.add_argument("--include-wing", default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("--include-cal", default=False, action=argparse.BooleanOptionalAction,
+                        help="Fit multiplicative cal scales for non-7DT optical LC datasets "
+                             "(i-band, Leavitt_Rc/Ic); 7DT is the flux reference")
+    parser.add_argument("--cal-uncert", type=float, default=0.1,
+                        help="Half-width of each cal scale about 1 (default 0.1 => [0.9, 1.1])")
     parser.add_argument("--use-spectral-index", default=True, action=argparse.BooleanOptionalAction,
                         help="Constrain the fit with the XRT spectral index (default: on)")
     parser.add_argument("--nsteps", type=int, default=3000)
@@ -143,6 +151,10 @@ def main(argv=None):
     print(f"\nTotal: {len(xrt_data['time'])} XRT + {total_optical} optical = {len(xrt_data['time']) + total_optical} points")
     print(f"Include flare: {args.include_flare}")
     print(f"Include wing: {args.include_wing}")
+    if args.include_cal:
+        print(f"Cross-cal (7DT reference): ±{args.cal_uncert:.0%} on {', '.join(NON_7DT_CAL_DATASETS)}")
+    else:
+        print("Cross-cal: not used")
     if xrt_index_data is not None:
         print(f"XRT spectral index: {len(xrt_index_data['time'])} points "
               f"(applied where core+wing dominate XRT, flare < {SI_FLARE_FRAC_MAX:.0%})")
@@ -150,7 +162,12 @@ def main(argv=None):
         print("XRT spectral index: not used")
 
     # Setup parameters
-    param_defs = make_param_defs(include_flare=args.include_flare, include_wing=args.include_wing)
+    param_defs = make_param_defs(
+        include_flare=args.include_flare,
+        include_wing=False,#$args.include_wing,
+        include_cal=args.include_cal,
+        cal_uncert=args.cal_uncert,
+    )
     labels = [f"log10_{p.name}" if p.scale is Scale.LOG else p.name for p in param_defs]
     ndim = len(labels)
 
@@ -190,6 +207,8 @@ def main(argv=None):
         phase_name += "_flare"
     if args.include_wing:
         phase_name += "_wing"
+    if args.include_cal:
+        phase_name += "_cal"
     outdir = Path(args.outdir) if args.outdir else FIT_RESULTS_DIR / f"{phase_name}_{run_ts}"
     outdir.mkdir(parents=True, exist_ok=True)
 
