@@ -57,8 +57,13 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
         #ParamDefWithPrior("theta_c_core", 0.001, 0.08, Scale.LOG), 
         ParamDefWithPrior("theta_c_core", 0.001, 1.0, Scale.LOG), 
 
-        # Environment & forward shock microphysics
+        # Medium environment
         ParamDefWithPrior("n_ism", 5, 400, Scale.LOG),
+        # ParamDefWithPrior("n0", 1e-2, 20, Scale.LOG),
+        # ParamDefWithPrior("A_star", 1e-3, 1.0, Scale.LOG),
+        # ParamDefWithPrior("k_m", 1.0, 3.0, Scale.LINEAR),
+        
+        # Forward shock microphysics
         #ParamDefWithPrior("p", 2.1, 2.5, Scale.LINEAR),
         ParamDefWithPrior("p", 2.01, 2.3, Scale.LINEAR),
         ParamDefWithPrior("eps_e", 0.02, 0.1, Scale.LOG),

@@ -43,6 +43,7 @@ INITIAL_GUESS = {
     "Gamma0_core": 551,
     "theta_c_core": 0.0391,
     "n_ism": 146.9,
+    # "A_star": 1e-1,
     "p": 2.164,
     "eps_e": 0.0416,
     "eps_B": 0.00563,
@@ -79,12 +80,14 @@ def parse_args(argv=None):
                         help="Fit multiplicative cal scales for non-7DT optical LC datasets "
                              "(i-band, Leavitt_Rc/Ic); 7DT is the flux reference")
     parser.add_argument("--cal-uncert", type=float, default=0.1,
-                        help="Half-width of each cal scale about 1 (default 0.1 => [0.9, 1.1])")
+                        help="Half-width of each cal scale about 1 (default 0.1 => [0.9, 1.1]). Enabled when include_cal is True")
     parser.add_argument("--use-spectral-index", default=True, action=argparse.BooleanOptionalAction,
                         help="Constrain the fit with the XRT spectral index (default: on)")
+    parser.add_argument("--mark-7dt-time", default=True, action=argparse.BooleanOptionalAction,
+                        help="Draw a vertical line at the 7DT spectrum time in the Optical Light Curves panel (default: on)")
     parser.add_argument("--nsteps", type=int, default=3000)
     parser.add_argument("--nwalkers", type=int, default=None)
-    parser.add_argument("--ncpus", type=int, default=64)
+    parser.add_argument("--ncpus", type=int, default=20)
     parser.add_argument("--outdir", default=None)
     return parser.parse_args(argv)
 
@@ -164,7 +167,7 @@ def main(argv=None):
     # Setup parameters
     param_defs = make_param_defs(
         include_flare=args.include_flare,
-        include_wing=False,#$args.include_wing,
+        include_wing=args.include_wing,
         include_cal=args.include_cal,
         cal_uncert=args.cal_uncert,
     )
@@ -225,7 +228,7 @@ def main(argv=None):
 
     # Plot light curves with best-fit model
     print("\nPlotting best-fit light curves...")
-    plot_light_curves(outdir)
+    plot_light_curves(outdir, mark_7dt_time=args.mark_7dt_time)
 
     if xrt_index_data is not None:
         print("Plotting spectral index comparison...")

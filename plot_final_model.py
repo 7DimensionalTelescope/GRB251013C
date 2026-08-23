@@ -30,6 +30,10 @@ def parse_args(argv=None):
         default=300,
         help="Posterior draws for 3-sigma (0.15-99.85%%) LC envelope (0 disables; default: 300)",
     )
+    parser.add_argument(
+        "--mark-7dt-time", default=True, action=argparse.BooleanOptionalAction,
+        help="Draw a vertical line at the 7DT spectrum time in the Optical Light Curves panel (default: on)",
+    )
     return parser.parse_args(argv)
 
 
@@ -54,7 +58,7 @@ def main(argv=None):
     print(f"  Model: Core+RS + Flare + Wing")
     if args.band_draws:
         print(f"  Posterior band: {args.band_draws} draws (3σ / 0.15-99.85%)")
-    plot_light_curves(result_dir, band_draws=args.band_draws)
+    plot_light_curves(result_dir, band_draws=args.band_draws, mark_7dt_time=args.mark_7dt_time)
 
     print(f"\nPlotting spectral index comparison...")
     plot_spectral_index_comparison(result_dir)

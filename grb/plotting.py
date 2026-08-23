@@ -189,11 +189,14 @@ def _posterior_draws(outdir, n_draws, seed, discard_frac=0.5):
     return samples[idx]
 
 
-def plot_light_curves(outdir, band_draws=300, band_seed=42):
+def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
     """Generate best-fit light curve plots with component contributions and 7DT spectrum.
 
     band_draws > 0 adds a ~0.15-99.85% (3 sigma) posterior envelope of the total model
     to each panel, computed from that many thinned post-burn-in posterior draws.
+
+    mark_7dt_time draws a vertical line in the Optical Light Curves panel at the
+    (median) time of the 7DT spectrum, if any 7DT data is present.
     """
     outdir = Path(outdir)
 
@@ -206,6 +209,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
     # Separate optical LC data from 7DT spectrum data
     lc_data = [d for d in optical_datasets if not d['name'].startswith('7DT_')]
     sdt_data = [d for d in optical_datasets if d['name'].startswith('7DT_')]
+    sed_time = float(np.median([d['time'][0] for d in sdt_data])) if sdt_data else None
 
     # Create time grid for model
     t_min = min(xrt_data['time'].min(), min(d['time'].min() for d in lc_data))
@@ -331,6 +335,9 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
         if include_flare and np.any(opt_components['flare'] > 0):
             ax_opt.plot(t_grid_hr, opt_components['flare'] * scale, color=color, ls=(0, (5, 1)), lw=1.2, alpha=0.7)
 
+    if mark_7dt_time and sed_time is not None:
+        ax_opt.axvline(sed_time / 3600, color='gray', ls='--', lw=1.0, alpha=0.7, label='7DT time')
+
     ax_opt.set_xlabel('Time since trigger [hr]', fontsize=11)
     ax_opt.set_ylabel('Flux density [mJy]', fontsize=11)
     ax_opt.set_xscale('log')
@@ -360,13 +367,11 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
 
     # === 7DT Spectrum Panel ===
     if sdt_data:
-        sdt_times = np.array([d['time'][0] for d in sdt_data])
         sdt_nu = np.array([d['frequency'] for d in sdt_data])
         sdt_wavelength = C_AA_PER_S / sdt_nu
         sdt_flux = np.array([d['flux_mJy'][0] for d in sdt_data])
         sdt_flux_err = np.array([d['flux_err'][0] for d in sdt_data])
 
-        sed_time = float(np.median(sdt_times))
         wavelength_grid = np.geomspace(sdt_wavelength.min() * 0.9, sdt_wavelength.max() * 1.1, 300)
         nu_grid = C_AA_PER_S / wavelength_grid
 

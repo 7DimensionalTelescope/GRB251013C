@@ -6,7 +6,7 @@ models, and loads every XRT and optical dataset the fit uses.
 import numpy as np
 import pandas as pd
 
-from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet
+from VegasAfterglow import ISM, Wind, Model, Observer, Radiation, TophatJet
 
 from .const import D_L, REDSHIFT, MODEL_RESOLUTIONS
 from .io import read_data, filter_data
@@ -114,7 +114,19 @@ def add_observation(df, fitter, input_type="flux_density", label=None, **kwargs)
 def make_core_model(params):
     """Core jet with reverse shock"""
     observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
+    
+    if "A_star" in params: # Wind medium
+        medium = Wind(
+            A_star=params["A_star"],
+            n_ism=params.get("n_ism"), # Outer ISM density (Stratified medium)
+            n0=params.get("n0"),       # Inner ISM density (Stratified medium)
+            k=params.get("k_m", 2),    # Wind density power-law index
+        )
+    elif "n_ism" in params: # ISM medium
+        medium = ISM(n_ism=params["n_ism"])
+    else:
+        raise ValueError("params must define either 'A_star' or 'n_ism'")
+
     jet = TophatJet(
         E_iso=params["E_iso_core"],
         Gamma0=params["Gamma0_core"],
@@ -151,7 +163,19 @@ def make_core_model(params):
 def make_wing_model(params):
     """Wing jet (no reverse shock, with spreading for late-time emission)"""
     observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
+    
+    if "A_star" in params: # Wind medium
+        medium = Wind(
+            A_star=params["A_star"],
+            n_ism=params.get("n_ism"), # Outer ISM density (Stratified medium)
+            n0=params.get("n0"),       # Inner ISM density (Stratified medium)
+            k=params.get("k_m", 2),    # Wind density power-law index
+        )
+    elif "n_ism" in params: # ISM medium
+        medium = ISM(n_ism=params["n_ism"])
+    else:
+        raise ValueError("params must define either 'A_star' or 'n_ism'")
+    
     jet = TophatJet(
         E_iso=params["E_iso_wing"],
         Gamma0=params["Gamma0_wing"],
