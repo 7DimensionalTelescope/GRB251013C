@@ -5,3 +5,5 @@ __pycache__/
 
 # MCMC run outputs: large generated artifacts (.npy chains, PNG figures)
 modeling/fit_results/
+
+*test*

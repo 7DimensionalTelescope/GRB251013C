@@ -203,6 +203,19 @@ def main(argv=None):
         )
         sampler.run_mcmc(pos0, args.nsteps, progress=True)
 
+    tau = sampler.get_autocorr_time(tol=0)
+
+    required_steps = 50 * np.max(tau)
+
+    print("tau:", tau)
+    print("nsteps:", sampler.iteration)
+    print("50 * max(tau):", required_steps)
+
+    if sampler.iteration > required_steps:
+        print("Chain length is sufficient by the 50 tau criterion.")
+    else:
+        print("Warning: Chain is too short by the 50 tau criterion.")
+
     # Save results
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     phase_name = "final"
