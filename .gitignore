@@ -8,3 +8,7 @@ modeling/fit_results/
 
 *test*
 CLAUDE.md
+# Early-phase numerical validation tests and their frozen reference are tracked despite *test* above
+# (*test* also matches the modeling/test directory itself, so it has to be re-included first).
+!modeling/test/
+!modeling/test/test_early_phase_refactor_equivalence.py
