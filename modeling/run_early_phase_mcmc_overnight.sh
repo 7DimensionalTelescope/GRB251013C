@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Autonomous overnight production MCMC of the early-phase fit (wind, xi_e and xi_e_r free, --prior production).
 #
-#   bash run_early_phase_mcmc_overnight.sh OUTDIR
+#   bash run_early_phase_mcmc_overnight.sh OUTDIR [SEED]      (SEED default 20261008 = run 1)
 #
 # Stage A: run to 30,000 total steps, then checkpoint diagnostics (early_phase.py --check-chain).
 # Stage B: if healthy but not converged, continue the SAME HDF chain (OUTDIR/chain.h5) to 60,000 and re-check.
@@ -14,12 +14,12 @@
 # On exit OUTDIR/FINAL_SUMMARY.txt holds the decision log, the last checkpoint summary and the output paths.
 set -u
 
-OUTDIR=${1:?usage: $0 OUTDIR}
+OUTDIR=${1:?usage: $0 OUTDIR [SEED]}
 PY=/home/hongyp007/anaconda3/envs/yp/bin/python
 CODE=/extdata01/hongyp007/projects/GRB/code/fitting/modeling
 NPOOL=20
 NWALKERS=64
-SEED=20261008
+SEED=${2:-20261008}
 STAGES=(30000 60000 80000 100000)
 MAX_STEPS=100000
 
