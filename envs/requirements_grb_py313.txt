@@ -1,0 +1,19 @@
+# GRB early-phase modelling stack for the separate Python 3.13 env "yp313" (2026-10-08).
+# Same versions as the Python 3.14 env "yp" (envs/yp_20261008_pip_freeze.txt); only the Python version differs, to
+# avoid the NumPy 2.2.4 temporary-elision bug under Python 3.14 (modeling/test/check_numpy_elision.py).
+numpy==2.2.4
+scipy==1.16.2
+VegasAfterglow==2.0.6
+emcee==3.1.6
+h5py==3.15.1
+bilby==2.7.1
+dynesty==3.0.0
+astropy==7.0.1
+pandas==2.2.3
+dustmaps==1.0.14
+healpy==1.19.0
+extinction==0.4.8
+python-dotenv==1.2.1
+matplotlib==3.10.8
+corner==2.2.3
+tqdm==4.67.1
