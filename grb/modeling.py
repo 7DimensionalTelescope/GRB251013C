@@ -120,7 +120,7 @@ def make_core_model(params):
             A_star=params["A_star"],
             n_ism=params.get("n_ism"), # Outer ISM density (Stratified medium)
             n0=params.get("n0"),       # Inner ISM density (Stratified medium)
-            k=params.get("k_m", 2),    # Wind density power-law index
+            k_m=params.get("k_m", 2),  # Wind density power-law index
         )
     elif "n_ism" in params: # ISM medium
         medium = ISM(n_ism=params["n_ism"])
@@ -138,19 +138,19 @@ def make_core_model(params):
         eps_e=params["eps_e"],
         eps_B=params["eps_B"],
         p=params["p"],
-        xi_e=params["xi"],
+        xi_e=params.get("xi", 1.0),
         ssc=False,
         kn=False,
     )
-    
+
     rvs_radiation = None
-    
+
     if "p_r" in params and "eps_e_r" in params and "eps_B_r" in params:
         rvs_radiation = Radiation(
             eps_e=params["eps_e_r"],
             eps_B=params["eps_B_r"],
             p=params["p_r"],
-            xi_e=params.get("xi_r", params["xi"]),
+            xi_e=params.get("xi_r", params.get("xi", 1.0)),
             ssc=False,
             kn=False,
         )
@@ -169,7 +169,7 @@ def make_wing_model(params):
             A_star=params["A_star"],
             n_ism=params.get("n_ism"), # Outer ISM density (Stratified medium)
             n0=params.get("n0"),       # Inner ISM density (Stratified medium)
-            k=params.get("k_m", 2),    # Wind density power-law index
+            k_m=params.get("k_m", 2),  # Wind density power-law index
         )
     elif "n_ism" in params: # ISM medium
         medium = ISM(n_ism=params["n_ism"])
@@ -187,7 +187,7 @@ def make_wing_model(params):
         eps_e=params.get("eps_e_wing", params["eps_e"]),
         eps_B=params.get("eps_B_wing", params["eps_B"]),
         p=params.get("p_wing", params["p"]),
-        xi_e=params.get("xi_wing", params["xi"]),
+        xi_e=params.get("xi_wing", params.get("xi", 1.0)),
         ssc=False,
         kn=False,
     )

@@ -32,7 +32,8 @@ TRIGGER_TIME = datetime.strptime(TRIGGER_TIME_STR, "%Y-%m-%dT%H:%M:%S UTC")
 
 MODEL_RESOLUTIONS = (0.1, 0.25, 10)
 
-FIT_RESULTS_DIR = Path(BASE_DIR) / "modeling" / "fit_results"
+# FIT_RESULTS_DIR = Path(BASE_DIR) / "modeling" / "fit_results"
+FIT_RESULTS_DIR = Path("/home/hongyp007/yp_folder/projects/GRB/result")
 
 # XRT 0.3-10 keV band, and the two frequencies (Hz) between which the local
 # synchrotron slope is measured for the spectral-index constraint.

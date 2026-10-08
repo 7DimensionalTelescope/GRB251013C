@@ -17,7 +17,7 @@ from .const import (
     XRT_NU_LO,
 )
 from .extinction import host_extinction_attenuation
-from .functions import norris_flare
+from .functions import flare_active, flare_flux
 from .modeling import make_core_model, make_wing_model
 from .params import dataset_cal_factor
 from .prior import ParamDefWithPrior
@@ -25,7 +25,7 @@ from .utils import model_array
 
 
 def spectral_index_model(core_model, wing_model, params, times, include_flare,
-                         flare_frac_max=SI_FLARE_FRAC_MAX):
+                         flare_frac_max=SI_FLARE_FRAC_MAX, flare_shape="norris"):
     """Model XRT spectral index and flux-contribution selection at given times.
 
     Returns (beta_model, keep), where beta_model is the local synchrotron slope
@@ -51,12 +51,11 @@ def spectral_index_model(core_model, wing_model, params, times, include_flare,
     keep = np.isfinite(beta_model)
 
     # Flux-contribution selection: drop points where the flare dominates the XRT flux
-    if include_flare and "t_start_flare" in params:
+    if include_flare and flare_active(flare_shape, params):
         cw_band = model_array(core_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total).copy()
         if wing_model is not None:
             cw_band = cw_band + model_array(wing_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total)
-        flare_band = norris_flare(times, params["t_start_flare"], params["tau_rise_flare"],
-                                  params["tau_decay_flare"], params["A_flare"])
+        flare_band = flare_flux(flare_shape, times, params)
         total_band = cw_band + flare_band
         flare_frac = np.divide(flare_band, total_band, out=np.zeros_like(total_band),
                                where=total_band > 0)
@@ -66,10 +65,11 @@ def spectral_index_model(core_model, wing_model, params, times, include_flare,
 
 
 def spectral_index_chi2(core_model, wing_model, params, xrt_index_data, include_flare,
-                        flare_frac_max=SI_FLARE_FRAC_MAX):
+                        flare_frac_max=SI_FLARE_FRAC_MAX, flare_shape="norris"):
     """Chi2 from the XRT spectral (photon) index (see spectral_index_model)."""
     beta_model, keep = spectral_index_model(
-        core_model, wing_model, params, xrt_index_data["time"], include_flare, flare_frac_max
+        core_model, wing_model, params, xrt_index_data["time"], include_flare, flare_frac_max,
+        flare_shape
     )
     if not np.any(keep):
         return 0.0
@@ -83,7 +83,7 @@ def spectral_index_chi2(core_model, wing_model, params, xrt_index_data, include_
 
 
 def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_flare, include_wing,
-                                 xrt_index_data=None):
+                                 xrt_index_data=None, flare_shape="norris"):
     """Compute model flux for XRT and all optical bands.
 
     Returns (xrt_flux, optical_fluxes, si_chi2), where si_chi2 is the XRT
@@ -108,10 +108,8 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
         xrt_flux += model_array(xrt_wing.total)
 
     # Flare in XRT
-    if include_flare and "t_start_flare" in params:
-        flare_temporal = norris_flare(xrt_times, params["t_start_flare"],
-                                     params["tau_rise_flare"], params["tau_decay_flare"],
-                                     params["A_flare"])
+    if include_flare and flare_active(flare_shape, params):
+        flare_temporal = flare_flux(flare_shape, xrt_times, params)
         xrt_flux += flare_temporal
 
     # Optical fluxes (all bands)
@@ -130,15 +128,13 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
             opt_flux += model_array(opt_wing.total)
 
         # Flare contribution (with spectral scaling)
-        if include_flare and "t_start_flare" in params:
+        if include_flare and flare_active(flare_shape, params):
             # XRT band for normalization
             nu_xrt_min = XRT_NU_LO
             nu_xrt_max = XRT_NU_HI
             beta_flare = params.get("flare_beta", 0.8)
 
-            flare_temporal = norris_flare(times, params["t_start_flare"],
-                                         params["tau_rise_flare"], params["tau_decay_flare"],
-                                         params["A_flare"])
+            flare_temporal = flare_flux(flare_shape, times, params)
 
             # Convert to flux density at optical frequency
             if abs(beta_flare - 1.0) < 0.01:
@@ -161,13 +157,14 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
     # XRT spectral-index chi2 (reuses the already-built core/wing models)
     si_chi2 = 0.0
     if xrt_index_data is not None and len(xrt_index_data["time"]) > 0:
-        si_chi2 = spectral_index_chi2(core_model, wing_model, params, xrt_index_data, include_flare)
+        si_chi2 = spectral_index_chi2(core_model, wing_model, params, xrt_index_data, include_flare,
+                                      flare_shape=flare_shape)
 
     return xrt_flux, optical_fluxes, si_chi2
 
 
 def log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                   xrt_index_data=None):
+                   xrt_index_data=None, flare_shape="norris"):
     """Log likelihood for all data"""
     params = {}
     for param_def, value in zip(param_defs, theta):
@@ -178,7 +175,8 @@ def log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare,
 
     try:
         xrt_model, optical_models, si_chi2 = compute_model_flux_all_bands(
-            params, xrt_data, optical_datasets, include_flare, include_wing, xrt_index_data
+            params, xrt_data, optical_datasets, include_flare, include_wing, xrt_index_data,
+            flare_shape
         )
 
         chi2 = 0.0
@@ -226,11 +224,11 @@ def log_prior(theta, param_defs):
 
 
 def log_probability(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                    xrt_index_data=None):
+                    xrt_index_data=None, flare_shape="norris"):
     """Combined log probability"""
     lp = log_prior(theta, param_defs)
     if not np.isfinite(lp):
         return -np.inf
     ll = log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                        xrt_index_data)
+                        xrt_index_data, flare_shape)
     return lp + ll

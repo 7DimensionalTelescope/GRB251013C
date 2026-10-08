@@ -76,7 +76,7 @@ def broken_power_law_prior(**kwargs):
     default_prior = {"F_bpl": "log_uniform", "t_break": "log_uniform", "alpha_1": "uniform", "alpha_2": "uniform"}
     return update_params(default_param_bounds, default_prior, kwargs)
 
-def smooth_broken_power_law_prior(**kwargs):
+def sbpl_prior(**kwargs):
     default_param_bounds = {
         "F_sbpl": (1e-15, 1e1),
         "t_break": (2, 100),

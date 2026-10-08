@@ -11,7 +11,7 @@ import numpy as np
 
 from .const import REDSHIFT, XRT_BAND, XRT_NU_HI, XRT_NU_LO
 from .extinction import host_extinction_attenuation
-from .functions import norris_flare
+from .functions import flare_active, flare_flux
 from .likelihood import spectral_index_model
 from .modeling import load_all_optical_data, make_core_model, make_wing_model
 from .params import dataset_cal_factor
@@ -71,7 +71,8 @@ def set_log_y_limits(ax, *values, lower_factor=0.5, upper_factor=2.0):
     ax.set_ylim(combined.min() * lower_factor, combined.max() * upper_factor)
 
 
-def compute_model_components(params, times, frequency, xrt_band, include_flare, include_wing):
+def compute_model_components(params, times, frequency, xrt_band, include_flare, include_wing,
+                             flare_shape="norris"):
     """Compute individual model components
 
     Returns dict with keys: 'core_fs', 'core_rs', 'flare', 'wing', 'total'
@@ -96,11 +97,9 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
             wing_flux = model_array(wing_output.total).copy()
 
         # Flare
-        flare_flux = np.zeros_like(core_fs)
-        if include_flare and "t_start_flare" in params:
-            flare_flux = norris_flare(times, params["t_start_flare"],
-                                     params["tau_rise_flare"], params["tau_decay_flare"],
-                                     params["A_flare"])
+        flare_component = np.zeros_like(core_fs)
+        if include_flare and flare_active(flare_shape, params):
+            flare_component = flare_flux(flare_shape, times, params)
     else:
         # Optical flux density
         nu_array = frequency * np.ones_like(times)
@@ -116,22 +115,20 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
             wing_flux = model_array(wing_output.total).copy()
 
         # Flare (with spectral scaling)
-        flare_flux = np.zeros_like(core_fs)
-        if include_flare and "t_start_flare" in params:
+        flare_component = np.zeros_like(core_fs)
+        if include_flare and flare_active(flare_shape, params):
             nu_xrt_min = XRT_NU_LO
             nu_xrt_max = XRT_NU_HI
             beta_flare = params.get("flare_beta", 0.8)
 
-            flare_temporal = norris_flare(times, params["t_start_flare"],
-                                         params["tau_rise_flare"], params["tau_decay_flare"],
-                                         params["A_flare"])
+            flare_temporal = flare_flux(flare_shape, times, params)
 
             if abs(beta_flare - 1.0) < 0.01:
                 K = flare_temporal / np.log(nu_xrt_max / nu_xrt_min)
             else:
                 K = flare_temporal * (1 - beta_flare) / (nu_xrt_max**(1-beta_flare) - nu_xrt_min**(1-beta_flare))
 
-            flare_flux = K * frequency**(-beta_flare)
+            flare_component = K * frequency**(-beta_flare)
 
         # Apply host extinction
         if "A_V" in params:
@@ -139,20 +136,20 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
             core_fs = core_fs * attenuation
             core_rs = core_rs * attenuation
             wing_flux = wing_flux * attenuation
-            flare_flux = flare_flux * attenuation
+            flare_component = flare_component * attenuation
 
         # Convert to mJy
         core_fs = core_fs * 1e26
         core_rs = core_rs * 1e26
         wing_flux = wing_flux * 1e26
-        flare_flux = flare_flux * 1e26
+        flare_component = flare_component * 1e26
 
-    total = core_fs + core_rs + wing_flux + flare_flux
+    total = core_fs + core_rs + wing_flux + flare_component
 
     return {
         'core_fs': core_fs,
         'core_rs': core_rs,
-        'flare': flare_flux,
+        'flare': flare_component,
         'wing': wing_flux,
         'total': total,
     }
@@ -189,20 +186,21 @@ def _posterior_draws(outdir, n_draws, seed, discard_frac=0.5):
     return samples[idx]
 
 
-def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
-    """Generate best-fit light curve plots with component contributions and 7DT spectrum.
+def render_light_curve_figure(params, include_flare, include_wing, outfile=None,
+                              posterior_draws=None, posterior_labels=None,
+                              mark_7dt_time=True, flare_shape="norris"):
+    """Render the 3-panel (XRT / optical light curves / 7DT spectrum) figure for a
+    given physical-parameter dict, with component contributions.
 
-    band_draws > 0 adds a ~0.15-99.85% (3 sigma) posterior envelope of the total model
-    to each panel, computed from that many thinned post-burn-in posterior draws.
+    posterior_draws (with posterior_labels) adds a ~0.15-99.85% (3 sigma) posterior
+    envelope of the total model to each panel; omit both for a single point estimate.
 
     mark_7dt_time draws a vertical line in the Optical Light Curves panel at the
     (median) time of the 7DT spectrum, if any 7DT data is present.
+
+    outfile is optional: pass a path to save the figure to disk (returns that path),
+    or omit it to skip saving and get the matplotlib Figure back for inline display.
     """
-    outdir = Path(outdir)
-
-    # Load best-fit parameters
-    params, include_flare, include_wing = load_best_fit_params(outdir)
-
     # Load data
     xrt_data, optical_datasets = load_all_optical_data()
 
@@ -218,26 +216,25 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
 
     # Compute XRT model components
     xrt_components = compute_model_components(params, t_grid, None, XRT_BAND,
-                                              include_flare, include_wing)
+                                              include_flare, include_wing, flare_shape)
 
     # 0.15-99.85% (~3 sigma) posterior envelopes of the total model in each panel
-    draws = _posterior_draws(outdir, band_draws, band_seed) if band_draws else None
+    draws = posterior_draws
+    sample_labels = posterior_labels
     band_xrt = None
     band_opt = {}
-    sample_labels = None
     if draws is not None:
-        sample_labels = read_labels(outdir / "labels.txt")
         lc_freqs = {d['name']: d['frequency'] for d in lc_data}
         xrt_stack = []
         opt_stack = {name: [] for name in lc_freqs}
         for theta in draws:
             dparams = _sample_to_params(sample_labels, theta)
             comp = compute_model_components(dparams, t_grid, None, XRT_BAND,
-                                            include_flare, include_wing)
+                                            include_flare, include_wing, flare_shape)
             xrt_stack.append(comp['total'])
             for name, nu in lc_freqs.items():
                 comp = compute_model_components(dparams, t_grid, nu, None,
-                                                include_flare, include_wing)
+                                                include_flare, include_wing, flare_shape)
                 cal = dataset_cal_factor(dparams, name)
                 opt_stack[name].append(comp['total'] * cal)
         band_xrt = np.percentile(xrt_stack, [0.15, 99.85], axis=0)
@@ -261,7 +258,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
     if band_xrt is not None:
         ax_xrt.fill_between(t_grid_hr, band_xrt[0], band_xrt[1], color='black',
                             alpha=0.25, lw=0, zorder=1, label=r'3$\sigma$ posterior')
-    ax_xrt.plot(t_grid_hr, xrt_components['total'], 'k-', lw=1.2, label='Total', zorder=3)
+    ax_xrt.plot(t_grid_hr, xrt_components['total'], 'k-', lw=1.2, label='Total')
     ax_xrt.plot(t_grid_hr, xrt_components['core_fs'], 'k:', lw=1.2, label='Core FS')
     ax_xrt.plot(t_grid_hr, xrt_components['core_rs'], 'c-.', lw=1.2, label='Reverse Shock')
     if include_wing:
@@ -286,9 +283,9 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
 
     # Offset factors for clarity (avoid overplotting)
     offset_factors = {
-        'i-band': 1.0,
-        'Leavitt_Rc': 1.5,  # Multiply by 1.5 for visibility
-        'Leavitt_Ic': 2.0,  # Multiply by 2.0 for visibility
+        'i-band': 2.0,
+        'Leavitt_Rc': 1.0,  # Multiply by 1.5 for visibility
+        'Leavitt_Ic': 4.0,  # Multiply by 2.0 for visibility
     }
 
     for dataset in lc_data:
@@ -319,7 +316,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
 
         # Compute components
         opt_components = compute_model_components(params, t_grid, nu, None,
-                                                  include_flare, include_wing)
+                                                  include_flare, include_wing, flare_shape)
 
         # Apply same offset factor to model (and cal scale relative to 7DT)
         scale = offset * cal
@@ -327,7 +324,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
             lo, hi = band_opt[dataset['name']]
             ax_opt.fill_between(t_grid_hr, lo * offset, hi * offset, color=color,
                                 alpha=0.25, lw=0, zorder=1)
-        ax_opt.plot(t_grid_hr, opt_components['total'] * scale, color=color, lw=1.2, zorder=3)
+        ax_opt.plot(t_grid_hr, opt_components['total'] * scale, color=color, lw=1.2)
         ax_opt.plot(t_grid_hr, opt_components['core_fs'] * scale, color=color, ls=':', lw=1.2, alpha=0.7)
         ax_opt.plot(t_grid_hr, opt_components['core_rs'] * scale, color=color, ls='-.', lw=1.2, alpha=0.7)
         if include_wing and np.any(opt_components['wing'] > 0):
@@ -377,7 +374,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
 
         # Compute spectrum components
         sed_components_list = [compute_model_components(params, np.array([sed_time]), nu, None,
-                                                        include_flare, include_wing)
+                                                        include_flare, include_wing, flare_shape)
                               for nu in nu_grid]
 
         total_sed = np.array([comp['total'][0] for comp in sed_components_list])
@@ -389,7 +386,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
             sed_times = np.full_like(nu_grid, sed_time)
             sed_stack = [compute_model_components(_sample_to_params(sample_labels, theta),
                                                   sed_times, nu_grid, None,
-                                                  include_flare, include_wing)['total']
+                                                  include_flare, include_wing, flare_shape)['total']
                          for theta in draws]
             sed_band = np.percentile(sed_stack, [0.15, 99.85], axis=0)
             ax_sed.fill_between(wavelength_grid, sed_band[0], sed_band[1], color='black',
@@ -398,7 +395,7 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
         # Plot 7DT data and model (with all components)
         ax_sed.errorbar(sdt_wavelength, sdt_flux, yerr=sdt_flux_err,
                        fmt='.', color='slategray', alpha=0.8, markersize=6, label='7DT data', zorder=5)
-        ax_sed.plot(wavelength_grid, total_sed, 'k-', lw=1.2, label=f'Total at {sed_time/3600:.2f} hr', zorder=4)
+        ax_sed.plot(wavelength_grid, total_sed, 'k-', lw=1.2, label=f'Total at {sed_time/3600:.2f} hr', zorder=2)
         ax_sed.plot(wavelength_grid, fs_sed, 'k:', lw=1.2, label='Core FS', zorder=3)
         ax_sed.plot(wavelength_grid, rs_sed, 'c-.', lw=1.2, label='Reverse Shock', zorder=3)
         if include_wing and np.any(wing_sed > 0):
@@ -425,13 +422,35 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
 
     fig.tight_layout()
 
-    # Save
-    outfile = outdir / "bestfit_lc.png"
-    plt.savefig(outfile, dpi=200, bbox_inches='tight')
-    plt.close()
+    if outfile is None:
+        return fig
+
+    outfile = Path(outfile)
+    plt.savefig(outfile, dpi=300, bbox_inches='tight')
+    plt.close(fig)
     print(f"  ✓ Saved: {outfile}")
 
     return outfile
+
+
+def plot_light_curves(outdir, band_draws=300, band_seed=42, mark_7dt_time=True):
+    """Generate best-fit light curve plots with component contributions and 7DT spectrum.
+
+    band_draws > 0 adds a ~0.15-99.85% (3 sigma) posterior envelope of the total model
+    to each panel, computed from that many thinned post-burn-in posterior draws.
+
+    mark_7dt_time draws a vertical line in the Optical Light Curves panel at the
+    (median) time of the 7DT spectrum, if any 7DT data is present.
+    """
+    outdir = Path(outdir)
+    params, include_flare, include_wing, flare_shape = load_best_fit_params(outdir)
+    draws = _posterior_draws(outdir, band_draws, band_seed) if band_draws else None
+    sample_labels = read_labels(outdir / "labels.txt") if draws is not None else None
+    return render_light_curve_figure(
+        params, include_flare, include_wing, outdir / "bestfit_lc.png",
+        posterior_draws=draws, posterior_labels=sample_labels,
+        mark_7dt_time=mark_7dt_time, flare_shape=flare_shape,
+    )
 
 
 def plot_spectral_index_comparison(outdir):
@@ -439,7 +458,7 @@ def plot_spectral_index_comparison(outdir):
     outdir = Path(outdir)
 
     # Load best-fit parameters
-    params, include_flare, include_wing = load_best_fit_params(outdir)
+    params, include_flare, include_wing, flare_shape = load_best_fit_params(outdir)
 
     # Try to load XRT spectral index data
     try:
@@ -457,12 +476,18 @@ def plot_spectral_index_comparison(outdir):
 
     p = params['p']
 
-    # Break frequencies for core and wing separately (panel 2)
-    core_breaks = compute_break_frequencies(
-        {"E_iso": params['E_iso_core'], "n_ism": params['n_ism'],
-         "eps_e": params['eps_e'], "eps_B": params['eps_B'], "p": params['p']},
-        REDSHIFT, t_grid
-    )
+    # Break frequencies for core and wing separately (panel 2). The formulas in
+    # compute_break_frequencies are Granot & Sari 2001 ISM (k=0) only, so they
+    # need n_ism; skip panel 2's model curves for a wind-only fit (A_star, no
+    # n_ism) rather than compute a physically wrong number.
+    has_ism_medium = "n_ism" in params
+    core_breaks = None
+    if has_ism_medium:
+        core_breaks = compute_break_frequencies(
+            {"E_iso": params['E_iso_core'], "n_ism": params['n_ism'],
+             "eps_e": params['eps_e'], "eps_B": params['eps_B'], "p": params['p']},
+            REDSHIFT, t_grid
+        )
     E_xrt_min = 0.3  # keV
     E_xrt_max = 10.0  # keV
 
@@ -477,20 +502,23 @@ def plot_spectral_index_comparison(outdir):
     beta_core, _ = spectral_index_model(core_model, None, params, t_grid, False)
     photon_index_core = 1.0 - beta_core  # Gamma = 1 - beta
 
+    wing_breaks = None
     if wing_model is not None:
         beta_wing, _ = spectral_index_model(wing_model, None, params, t_grid, False)
         photon_index_wing = 1.0 - beta_wing
-        wing_breaks = compute_break_frequencies(
-            {"E_iso": params['E_iso_wing'], "n_ism": params['n_ism'],
-             "eps_e": params.get('eps_e_wing', params['eps_e']),
-             "eps_B": params.get('eps_B_wing', params['eps_B']),
-             "p": params.get('p_wing', params['p'])},
-            REDSHIFT, t_grid
-        )
+        if has_ism_medium:
+            wing_breaks = compute_break_frequencies(
+                {"E_iso": params['E_iso_wing'], "n_ism": params['n_ism'],
+                 "eps_e": params.get('eps_e_wing', params['eps_e']),
+                 "eps_B": params.get('eps_B_wing', params['eps_B']),
+                 "p": params.get('p_wing', params['p'])},
+                REDSHIFT, t_grid
+            )
 
     # keep mask = the fit's actual flux-contribution selection (uses summed core+wing)
     _, keep = spectral_index_model(core_model, wing_model, params,
-                                   xrt_index_data['time'], include_flare)
+                                   xrt_index_data['time'], include_flare,
+                                   flare_shape=flare_shape)
 
     # Create plot
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
@@ -516,10 +544,12 @@ def plot_spectral_index_comparison(outdir):
     ax1.grid(which='both', alpha=0.25)
     ax1.set_title(f'XRT Spectral Index Evolution (p = {p:.3f})', fontsize=12, fontweight='bold')
 
-    # Panel 2: Break frequencies (core solid, wing dashed)
-    ax2.loglog(t_grid_hr, core_breaks["nu_m"], 'r-', lw=2, label=r'Core $\nu_m$')
-    ax2.loglog(t_grid_hr, core_breaks["nu_c"], color='darkorange', lw=2, label=r'Core $\nu_c$')
-    if wing_model is not None:
+    # Panel 2: Break frequencies (core solid, wing dashed). ISM-only (see above);
+    # left blank for a wind-only fit.
+    if core_breaks is not None:
+        ax2.loglog(t_grid_hr, core_breaks["nu_m"], 'r-', lw=2, label=r'Core $\nu_m$')
+        ax2.loglog(t_grid_hr, core_breaks["nu_c"], color='darkorange', lw=2, label=r'Core $\nu_c$')
+    if wing_breaks is not None:
         ax2.loglog(t_grid_hr, wing_breaks["nu_m"], 'b--', lw=2, label=r'Wing $\nu_m$')
         ax2.loglog(t_grid_hr, wing_breaks["nu_c"], color='green', ls='--', lw=2, label=r'Wing $\nu_c$')
 
