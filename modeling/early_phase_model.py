@@ -570,3 +570,57 @@ def posterior_decomposition(params_array, param_defs, xrt_data, i_data, xrt_inde
         "log_likelihood": ll,
         "log_posterior": lp + ll,
     }
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Sampling coordinates: an optional change of the sampler's coordinates only (2026-10-08).
+#
+# "physical": the sampler moves in the sampled space above (log10 for LOG parameters, linear otherwise).
+# "q_E_xir":  log10_E_iso is replaced, in the same slot, by q_E_xir = log10(E_iso * xi_e_r) = log10_E_iso + log10(xi_e_r);
+#             xi_e_r stays a coordinate. Before every evaluation the vector is mapped back
+#             (log10_E_iso = q_E_xir - log10(xi_e_r)) and handed to the unchanged log_probability, whose log_prior
+#             still enforces the E_iso and xi_e_r box bounds on the reconstructed values. The map
+#             (log10_E_iso, xi_e_r) -> (q_E_xir, xi_e_r) has Jacobian determinant 1, so the prior measure (uniform in
+#             log10_E_iso, linear in xi_e_r) is exactly the same; q_E_xir has no box of its own.
+# ---------------------------------------------------------------------------------------------------------------
+SAMPLING_COORDS = ("physical", "q_E_xir")
+Q_E_XIR = "q_E_xir"
+
+
+def sampling_labels(labels, coords):
+    """Labels of the sampler's coordinates for physical-space labels `labels`."""
+    if coords == "physical":
+        return list(labels)
+    if coords == Q_E_XIR:
+        return [Q_E_XIR if l == "log10_E_iso" else l for l in labels]
+    raise ValueError(f"sampling coordinates must be one of {SAMPLING_COORDS}, got {coords!r}")
+
+
+def _q_indices(labels):
+    if "log10_E_iso" not in labels or "xi_e_r" not in labels:
+        raise ValueError("q_E_xir coordinates need log10_E_iso and a free xi_e_r")
+    return labels.index("log10_E_iso"), labels.index("xi_e_r")
+
+
+def to_sampling_coords(x, labels, coords):
+    """Physical sampled-space vector(s) x (..., ndim) -> sampler coordinates."""
+    y = np.array(x, dtype=float)
+    if coords == "physical":
+        return y
+    sampling_labels(labels, coords)
+    e_i, xi_i = _q_indices(labels)
+    y[..., e_i] = y[..., e_i] + np.log10(y[..., xi_i])
+    return y
+
+
+def from_sampling_coords(y, labels, coords):
+    """Sampler coordinates (..., ndim) -> physical sampled-space vector(s). Non-positive xi_e_r gives a non-finite
+    log10_E_iso, which log_prior rejects together with the xi_e_r bound itself."""
+    x = np.array(y, dtype=float)
+    if coords == "physical":
+        return x
+    sampling_labels(labels, coords)
+    e_i, xi_i = _q_indices(labels)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x[..., e_i] = x[..., e_i] - np.log10(x[..., xi_i])
+    return x

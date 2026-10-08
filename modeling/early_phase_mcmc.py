@@ -31,9 +31,12 @@ from early_phase_model import (
     _init_early_phase_context,
     _log_probability_from_context,
     _sampled_bounds,
+    from_sampling_coords,
     make_param_defs,
     param_label,
     physical_param_value,
+    sampling_labels,
+    to_sampling_coords,
 )
 from early_phase_optimize import find_start_point
 
@@ -397,6 +400,56 @@ def ridge_aware_initial_state(param_defs, nwalkers, rng, map_func, outdir):
     return p0, lp0
 
 
+def posterior_initial_state(param_defs, nwalkers, rng, map_func, outdir, source_dirs, discard=50000):
+    """Walkers drawn from the posterior already established by earlier production chains with the same prior.
+
+    The ridge-aware strategy adapted to a known posterior: instead of hand-picked optima spread along the
+    degeneracy, take nwalkers points from the post-discard part of each source chain (split evenly between the
+    sources; distinct walkers within a source, random steps), converted to physical coordinates. Every point is
+    re-evaluated and must have finite log_probability.
+    """
+    import csv
+
+    labels = [param_label(p) for p in param_defs]
+    per = [nwalkers // len(source_dirs) + (k < nwalkers % len(source_dirs)) for k in range(len(source_dirs))]
+    points, rows = [], []
+    for source, k in zip(source_dirs, per):
+        source = Path(source)
+        config = json.loads((source / RUN_CONFIG_FILE).read_text())
+        if config["labels"] != labels:
+            raise ValueError(f"{source} has a different parameter layout: {config['labels']}")
+        def prior_key(defs):
+            return [(p.name, p.lower, p.upper, p.scale, p.gaussian_prior) for p in defs]
+        if prior_key(make_param_defs(**config["param_kwargs"])) != prior_key(param_defs):
+            raise ValueError(f"{source} was sampled with a different prior")
+        reader = emcee.backends.HDFBackend(str(source / CHAIN_FILE), name="mcmc", read_only=True)
+        chain = from_sampling_coords(reader.get_chain(discard=discard), labels, config.get("sampling_coords", "physical"))
+        walkers = rng.permutation(chain.shape[1])[:k]
+        steps = rng.integers(0, chain.shape[0], k)
+        for w, t in zip(walkers, steps):
+            points.append(chain[t, w])
+            rows.append({"source": str(source), "source_step": int(discard + t), "source_walker": int(w)})
+    p0 = np.array(points)
+    lp0 = np.array(list(map_func(_log_probability_from_context, list(p0))))
+    if not np.all(np.isfinite(lp0)):
+        raise RuntimeError(f"{int((~np.isfinite(lp0)).sum())} posterior draws have non-finite log_probability")
+    outdir.mkdir(parents=True, exist_ok=True)
+    np.save(outdir / "initial_walkers.npy", p0)
+    np.save(outdir / "initial_log_prob.npy", lp0)
+    with open(outdir / "initial_walkers.csv", "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=["walker", *rows[0], "log_prob", *labels])
+        writer.writeheader()
+        writer.writerows({"walker": i, **r, "log_prob": lp, **dict(zip(labels, x))}
+                         for i, (r, lp, x) in enumerate(zip(rows, lp0, p0)))
+    print(f"Initial ensemble: {nwalkers} posterior draws (steps >= {discard}) from " + ", ".join(
+        f"{Path(d).name}: {k}" for d, k in zip(source_dirs, per)))
+    print_initial_ranges(p0, lp0, labels)
+    q = np.log10(physical_columns(p0, labels)["E_iso"] * p0[:, labels.index("xi_e_r")])
+    print(f"{'q_E_xir':<10} {q.min():>12.5g} {np.median(q):>12.5g} {q.max():>12.5g}   (log10 E_iso xi_e_r)")
+    print(f"Saved: {outdir / 'initial_walkers.npy'} (physical coordinates), initial_log_prob.npy, initial_walkers.csv")
+    return p0, lp0
+
+
 def print_initial_ranges(p0, lp0, labels):
     phys = physical_columns(p0, labels)
     print(f"{'parameter':<10} {'min':>12} {'median':>12} {'max':>12}   (physical units)")
@@ -423,16 +476,22 @@ def print_parameter_table(param_defs):
 # Worker-side wrapper: a model exception at an extreme point becomes -inf (and is logged) instead of killing an
 # overnight run; the checkpoint diagnostics count the logged failures. The likelihood itself is untouched.
 _WORKER_ERROR_LOG = None
+_WORKER_COORDS = (None, "physical")         # (physical labels, sampling coordinates)
 
 
-def _init_mcmc_worker(context, error_log):
-    global _WORKER_ERROR_LOG
+def _init_mcmc_worker(context, error_log, labels=None, coords="physical"):
+    global _WORKER_ERROR_LOG, _WORKER_COORDS
     _init_early_phase_context(context)
     _WORKER_ERROR_LOG = error_log
+    _WORKER_COORDS = (labels, coords)
 
 
 def _mcmc_log_probability(params_array):
+    """Sampler coordinates -> physical sampled space (identity for "physical") -> the unchanged log_probability."""
+    labels, coords = _WORKER_COORDS
     try:
+        if coords != "physical":
+            params_array = from_sampling_coords(params_array, labels, coords)
         return _log_probability_from_context(params_array)
     except Exception as exc:
         if _WORKER_ERROR_LOG is not None:
@@ -453,11 +512,15 @@ def _write_json(path, payload):
 
 
 def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_index_cooling, outdir, nsteps,
-                        nwalkers=None, npool=20, seed=None, resume=False, run_config=None, log_every=500):
+                        nwalkers=None, npool=20, seed=None, resume=False, run_config=None, log_every=500,
+                        sampling_coords="physical", init_from=None):
     """emcee with the DE move mixture and an HDF backend; runs (or continues) the SAME chain to `nsteps` total steps.
 
-    New run: ridge-aware start, backend reset, run_config.json written. resume=True: reopens <outdir>/chain.h5
-    and appends from its last state (emcee restores the stored random state), never restarting the chain.
+    New run: ridge-aware start (or posterior draws from init_from chains), backend reset, run_config.json written.
+    resume=True: reopens <outdir>/chain.h5 and appends from its last state (emcee restores the stored random state),
+    never restarting the chain. sampling_coords (early_phase_model.SAMPLING_COORDS) chooses the sampler's coordinates;
+    the HDF chain stores those coordinates, run_config.json records them, and the likelihood is always evaluated on
+    the physical vector.
     """
     from concurrent.futures import ProcessPoolExecutor
 
@@ -475,6 +538,7 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
             raise ValueError(f"Labels of {config_path} differ from the requested configuration:\n"
                              f"  saved: {config['labels']}\n  now:   {labels}")
         nwalkers = config["nwalkers"]
+        sampling_coords = config.get("sampling_coords", "physical")
         if npool != config["npool"]:
             print(f"Note: resuming with {npool} workers (chain started with {config['npool']}).")
     else:
@@ -484,7 +548,10 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
         seed = int(np.random.SeedSequence().entropy % 2**31) if seed is None else seed
         config = {
             **(run_config or {}), "labels": labels, "ndim": ndim, "nwalkers": nwalkers, "seed": seed, "npool": npool,
-            "moves": MOVES_DESCRIPTION, "initialisation": "ridge-aware (RIDGE_ANCHORS + degeneracy ridge + jitter)",
+            "moves": MOVES_DESCRIPTION,
+            "initialisation": (f"posterior draws from {[str(d) for d in init_from]}" if init_from
+                               else "ridge-aware (RIDGE_ANCHORS + degeneracy ridge + jitter)"),
+            "sampling_coords": sampling_coords, "sampling_labels": sampling_labels(labels, sampling_coords),
             "bounds": [{"name": p.name, "label": param_label(p), "lower": p.lower, "upper": p.upper,
                         "scale": "log10" if p.scale is Scale.LOG else "linear",
                         "gaussian_prior": p.get_prior_mean_sigma() if p.has_gaussian_prior() else None}
@@ -497,7 +564,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
         }
 
     error_log = str(outdir / "worker_errors.log")
-    with ProcessPoolExecutor(max_workers=npool, initializer=_init_mcmc_worker, initargs=(context, error_log)) as pool:
+    with ProcessPoolExecutor(max_workers=npool, initializer=_init_mcmc_worker,
+                             initargs=(context, error_log, labels, sampling_coords)) as pool:
         if resume:
             backend = emcee.backends.HDFBackend(str(chain_path), name="mcmc")
             if backend.shape != (nwalkers, ndim):
@@ -506,7 +574,17 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
             print(f"Resuming {chain_path} at step {backend.iteration} (target {nsteps} total steps).")
         else:
             rng = np.random.default_rng(seed)
-            initial, _ = ridge_aware_initial_state(param_defs, nwalkers, rng, pool.map, outdir)
+            if init_from:
+                initial, _ = posterior_initial_state(param_defs, nwalkers, rng, pool.map, outdir, init_from)
+            else:
+                initial, _ = ridge_aware_initial_state(param_defs, nwalkers, rng, pool.map, outdir)
+            initial = to_sampling_coords(initial, labels, sampling_coords)
+            lp_check = np.array(list(pool.map(_mcmc_log_probability, list(initial))))
+            if not np.all(np.isfinite(lp_check)):
+                raise RuntimeError("Initial walkers have non-finite log_probability in sampling coordinates.")
+            print(f"Sampling coordinates: {sampling_coords} ({sampling_labels(labels, sampling_coords)}); all "
+                  f"{nwalkers} initial walkers finite through the sampler's log_probability "
+                  f"(range {lp_check.min():.3f} to {lp_check.max():.3f})", flush=True)
             backend = emcee.backends.HDFBackend(str(chain_path), name="mcmc")
             backend.reset(nwalkers, ndim)
             _write_json(config_path, config)
@@ -581,7 +659,19 @@ KEY_PAIRS = [("log10_E_iso", "xi_e"), ("log10_E_iso", "xi_e_r"), ("xi_e", "xi_e_
 
 
 def _autocorr(chain):
-    return emcee.autocorr.integrated_time(chain, c=5, tol=0, quiet=True)
+    """emcee's integrated autocorrelation time (walker-averaged ACF, auto window c = 5), except that walkers whose
+    series is constant in this window are left out of the average (their 0/0 ACF would turn the result into NaN).
+    Identical to emcee.autocorr.integrated_time(chain, c=5, tol=0) when every walker moves."""
+    n, nwalkers, ndim = chain.shape
+    tau = np.full(ndim, np.nan)
+    for d in range(ndim):
+        moving = [k for k in range(nwalkers) if np.ptp(chain[:, k, d]) > 0]
+        if not moving:
+            continue
+        f = np.mean([emcee.autocorr.function_1d(chain[:, k, d]) for k in moving], axis=0)
+        taus = 2.0 * np.cumsum(f) - 1.0
+        tau[d] = taus[emcee.autocorr.auto_window(taus, 5)]
+    return tau
 
 
 def provisional_discard(chain):
@@ -610,8 +700,11 @@ def check_chain(outdir, final=False):
         raise ValueError("Parameter layout rebuilt from run_config.json differs from the saved labels.")
     bounds = _sampled_bounds(param_defs)
     span = bounds[:, 1] - bounds[:, 0]
+    coords = config.get("sampling_coords", "physical")      # old runs: the chain is in physical coordinates
+    slabels = sampling_labels(labels, coords)
     reader = emcee.backends.HDFBackend(str(outdir / CHAIN_FILE), name="mcmc", read_only=True)
-    chain = reader.get_chain()
+    chain_s = reader.get_chain()                               # sampler coordinates: mixing diagnostics
+    chain = from_sampling_coords(chain_s, labels, coords)      # physical coordinates: posterior summaries
     log_prob = reader.get_log_prob()
     n, nwalkers, ndim = chain.shape
     ckdir = outdir / "checkpoints" / f"step_{n:06d}"
@@ -627,12 +720,13 @@ def check_chain(outdir, final=False):
 
     say(f"=== Chain diagnostics at step {n} ({datetime.now():%Y-%m-%d %H:%M:%S}) ===")
     say(f"chain: {outdir / CHAIN_FILE}; ndim {ndim}, nwalkers {nwalkers}, workers {config['npool']}, seed {config['seed']}")
-    say(f"moves: {config['moves']}; prior {config['prior']}, environment {config['environment']}, xi {config['xi']}")
+    say(f"moves: {config['moves']}; prior {config['prior']}, environment {config['environment']}, xi {config['xi']}; "
+        f"sampling coordinates {coords}")
     wall = sum(s["wall_seconds"] for s in config["segments"])
     say(f"wall-clock sampling time so far: {wall / 3600:.2f} h over {len(config['segments'])} segment(s)")
 
     # numerical health
-    n_nonfinite = int((~np.isfinite(chain)).sum())
+    n_nonfinite = int((~np.isfinite(chain_s)).sum())
     n_bad_lp = int(np.isnan(log_prob).sum() + np.isposinf(log_prob).sum())
     n_neg_inf_now = int(np.isneginf(log_prob[-1]).sum())
     err_path = outdir / "worker_errors.log"
@@ -648,7 +742,7 @@ def check_chain(outdir, final=False):
     # acceptance
     med_acc = float(np.median(acc))
     q = max(1, n // 4)
-    moved_recent = np.mean(np.any(chain[-q:][1:] != chain[-q:][:-1], axis=2), axis=0)
+    moved_recent = np.mean(np.any(chain_s[-q:][1:] != chain_s[-q:][:-1], axis=2), axis=0)
     frozen = np.where((acc < FROZEN_ACCEPTANCE) | (moved_recent < FROZEN_ACCEPTANCE))[0]
     say(f"acceptance: mean {acc.mean():.3f}, median {med_acc:.3f}, min {acc.min():.3f} (walker {acc.argmin()}), "
         f"max {acc.max():.3f}; last-quarter move fraction mean {moved_recent.mean():.3f} min {moved_recent.min():.3f}")
@@ -672,31 +766,32 @@ def check_chain(outdir, final=False):
         warnings.append(f"{len(isolated)} isolated walker(s): {isolated.tolist()}")
 
     # burn-in, autocorrelation, stationarity
-    discard = provisional_discard(chain)
+    discard = provisional_discard(chain_s)
+    post_s = chain_s[discard:]
     post = chain[discard:]
     post_lp = log_prob[discard:]
     n_post = len(post)
-    tau = _autocorr(post)
-    tau_75 = _autocorr(post[: int(0.75 * n_post)])
-    tau_50 = _autocorr(post[: n_post // 2])
+    tau = _autocorr(post_s)
+    tau_75 = _autocorr(post_s[: int(0.75 * n_post)])
+    tau_50 = _autocorr(post_s[: n_post // 2])
     tau_max, tau_med = float(np.nanmax(tau)), float(np.nanmedian(tau))
     tau_change = abs(tau_max - np.nanmax(tau_75)) / tau_max
     ess = n_post * nwalkers / tau
     say(f"provisional discard: {discard} steps (5 tau_ac,max of the second half, clamped to [n/5, n/2]); "
         f"post-burn length {n_post}")
-    say(f"autocorrelation time: max {tau_max:.0f} ({labels[int(np.nanargmax(tau))]}), median {tau_med:.0f}; "
+    say(f"autocorrelation time (sampling coordinates): max {tau_max:.0f} ({slabels[int(np.nanargmax(tau))]}), median {tau_med:.0f}; "
         f"N_post / tau_max = {n_post / tau_max:.1f} (target >= {CONVERGED_TAU_MULTIPLE}); tau_max at 50/75/100% of "
         f"post-burn: {np.nanmax(tau_50):.0f} / {np.nanmax(tau_75):.0f} / {tau_max:.0f} (change {100 * tau_change:.0f}%)")
-    halves = post[: n_post // 2].reshape(-1, ndim), post[n_post // 2:].reshape(-1, ndim)
-    shift = np.abs(halves[1].mean(0) - halves[0].mean(0)) / post.reshape(-1, ndim).std(0)
+    halves = post_s[: n_post // 2].reshape(-1, ndim), post_s[n_post // 2:].reshape(-1, ndim)
+    shift = np.abs(halves[1].mean(0) - halves[0].mean(0)) / post_s.reshape(-1, ndim).std(0)
     q4 = max(1, n_post // 4)
     lp_drift = float(np.median(post_lp[-q4:]) - np.median(post_lp[:q4]))
-    say(f"stationarity: largest mean shift between post-burn halves {shift.max():.2f} sigma ({labels[int(shift.argmax())]}); "
+    say(f"stationarity: largest mean shift between post-burn halves {shift.max():.2f} sigma ({slabels[int(shift.argmax())]}); "
         f"post-burn log_prob median drift (last - first quarter) {lp_drift:+.2f}")
     if lp_drift > FAIL_LOGP_DRIFT:
         (serious if stage_serious_drift else warnings).append(f"log_prob still rising by {lp_drift:.1f} after burn-in")
     # split-R-hat over walkers (ensemble walkers are not independent; used only as a mixing indicator)
-    halves_w = np.concatenate([post[: n_post // 2], post[n_post // 2: 2 * (n_post // 2)]], axis=1)
+    halves_w = np.concatenate([post_s[: n_post // 2], post_s[n_post // 2: 2 * (n_post // 2)]], axis=1)
     m_chain = halves_w.mean(0)
     w_var = halves_w.var(0, ddof=1).mean(0)
     b_var = (n_post // 2) * m_chain.var(0, ddof=1)
@@ -716,16 +811,17 @@ def check_chain(outdir, final=False):
         serious.append("chain is not in the known high-probability high-tau region")
 
     # per-parameter table
-    say(f"{'parameter':<15} {'tau_ac':>8} {'ESS':>8} {'R-hat':>7} {'shift':>6} {'median':>11} {'-1sig':>10} {'+1sig':>10}"
-        f" {'@lower':>7} {'@upper':>7}   (@: % of samples within min(1% range, 0.5 sigma) of the bound)")
+    say(f"{'coordinate':<15} {'tau_ac':>8} {'ESS':>8} {'R-hat':>7} {'shift':>6} | {'parameter':<15} {'median':>11} {'-1sig':>10} "
+        f"{'+1sig':>10} {'@lower':>7} {'@upper':>7}   (tau_ac..shift: sampling coordinate; median..: physical sampled space;"
+        f" @: % of samples within min(1% range, 0.5 sigma) of the bound)")
     pileups = []
     edge = np.minimum(BOUND_FRACTION * span, BOUND_SIGMA * flat.std(0))
     near_lo = (flat - bounds[:, 0] < edge).mean(0)
     near_hi = (bounds[:, 1] - flat < edge).mean(0)
     for j, l in enumerate(labels):
         lo, med, hi = np.percentile(flat[:, j], [16, 50, 84])
-        say(f"{l:<15} {tau[j]:>8.0f} {ess[j]:>8.0f} {rhat[j]:>7.3f} {shift[j]:>6.2f} {med:>11.5g} {med - lo:>10.4g} "
-            f"{hi - med:>10.4g} {100 * near_lo[j]:>6.1f}% {100 * near_hi[j]:>6.1f}%")
+        say(f"{slabels[j]:<15} {tau[j]:>8.0f} {ess[j]:>8.0f} {rhat[j]:>7.3f} {shift[j]:>6.2f} | {l:<15} {med:>11.5g} "
+            f"{med - lo:>10.4g} {hi - med:>10.4g} {100 * near_lo[j]:>6.1f}% {100 * near_hi[j]:>6.1f}%")
         for side, frac in (("lower", near_lo[j]), ("upper", near_hi[j])):
             if frac > PILEUP_FRACTION:
                 pileups.append(f"{l} {side} ({100 * frac:.1f}% of samples in the edge zone)")
@@ -767,7 +863,7 @@ def check_chain(outdir, final=False):
 
     # exports for the existing tools (thinned post-burn samples) and plots
     thin = max(1, int(0.5 * np.nanmin(tau)))
-    samples = reader.get_chain(discard=discard, thin=thin, flat=True)
+    samples = from_sampling_coords(reader.get_chain(discard=discard, thin=thin, flat=True), labels, coords)
     sample_lp = reader.get_log_prob(discard=discard, thin=thin, flat=True)
     from grb.results import top_k_samples
     top_params, top_lp = top_k_samples(flat, flat_lp, top_k=10)
@@ -782,10 +878,10 @@ def check_chain(outdir, final=False):
     diagnostics = {
         "step": n, "discard_provisional": discard, "thin": thin, "n_post": n_post, "nwalkers": nwalkers, "ndim": ndim,
         "acceptance_mean": float(acc.mean()), "acceptance_per_walker": acc.tolist(),
-        "tau_ac": dict(zip(labels, tau.tolist())), "tau_ac_max": tau_max, "tau_ac_median": tau_med,
+        "sampling_coords": coords, "tau_ac": dict(zip(slabels, tau.tolist())), "tau_ac_max": tau_max, "tau_ac_median": tau_med,
         "tau_ac_max_at_50_75_100": [float(np.nanmax(tau_50)), float(np.nanmax(tau_75)), tau_max],
-        "ess": dict(zip(labels, ess.tolist())), "rhat_walkers": dict(zip(labels, rhat.tolist())),
-        "mean_shift_sigma": dict(zip(labels, shift.tolist())), "log_prob_drift": lp_drift,
+        "ess": dict(zip(slabels, ess.tolist())), "rhat_walkers": dict(zip(slabels, rhat.tolist())),
+        "mean_shift_sigma": dict(zip(slabels, shift.tolist())), "log_prob_drift": lp_drift,
         "best_log_prob": best_lp, "best_log_prob_post_burn": best_post_lp, "median_tau_s": tau_med_s, "frozen_walkers": frozen.tolist(),
         "isolated_walkers": isolated.tolist(), "boundary_pileups": pileups, "serious": serious, "warnings": warnings,
         "decision": verdict, "exit_code": code, "wall_seconds": wall,
@@ -793,8 +889,8 @@ def check_chain(outdir, final=False):
     _write_json(ckdir / "diagnostics.json", diagnostics)
     (ckdir / "summary.txt").write_text("\n".join(lines) + "\n")
     # plots last: a plotting failure is reported but never changes or blocks the decision above
-    for name, plot in (("chain diagnostics", lambda: _plot_chain_diagnostics(plt, chain, log_prob, acc, labels, discard,
-                                                                             tau, ckdir, flat, phys)),
+    for name, plot in (("chain diagnostics", lambda: _plot_chain_diagnostics(plt, chain_s, log_prob, acc, slabels, discard,
+                                                                             tau, ckdir, flat, phys, labels)),
                        ("best fit / corner", lambda: _plot_fit_and_corner(param_defs, config, ckdir, outdir))):
         try:
             plot()
@@ -834,7 +930,10 @@ def _plot_fit_and_corner(param_defs, config, ckdir, outdir):
     plot_corner(ckdir, max_samples=20000)
 
 
-def _plot_chain_diagnostics(plt, chain, log_prob, acc, labels, discard, tau, ckdir, flat, phys):
+def _plot_chain_diagnostics(plt, chain, log_prob, acc, labels, discard, tau, ckdir, flat, phys, flat_labels=None):
+    """Traces and autocorrelation use `chain` / `labels` (sampling coordinates); pair plots and marginals use the
+    physical `flat` / `flat_labels` (default: the same labels)."""
+    flat_labels = labels if flat_labels is None else flat_labels
     n, nwalkers, ndim = chain.shape
     stride = max(1, n // 3000)
     steps = np.arange(0, n, stride)
@@ -882,12 +981,12 @@ def _plot_chain_diagnostics(plt, chain, log_prob, acc, labels, discard, tau, ckd
     fig.savefig(ckdir / "acceptance_autocorr.png", dpi=110)
     plt.close(fig)
 
-    pairs = [(a, b) for a, b in KEY_PAIRS if a in labels and b in labels][:12]
+    pairs = [(a, b) for a, b in KEY_PAIRS if a in flat_labels and b in flat_labels][:12]
     rng = np.random.default_rng(0)
     pick = rng.choice(len(flat), min(len(flat), 20000), replace=False)
     fig, axes = plt.subplots(3, 4, figsize=(15, 10))
     for ax, (a, b) in zip(axes.flat, pairs):
-        ax.plot(flat[pick, labels.index(a)], flat[pick, labels.index(b)], ",", alpha=0.4)
+        ax.plot(flat[pick, flat_labels.index(a)], flat[pick, flat_labels.index(b)], ",", alpha=0.4)
         ax.set_xlabel(a, fontsize=8)
         ax.set_ylabel(b, fontsize=8)
         ax.tick_params(labelsize=7)
@@ -895,13 +994,17 @@ def _plot_chain_diagnostics(plt, chain, log_prob, acc, labels, discard, tau, ckd
     fig.savefig(ckdir / "key_correlations.png", dpi=110)
     plt.close(fig)
 
-    names = ("tau", "xi_e", "xi_e_r", "E_iso", "eps_e_r", "eps_B_r")
-    fig, axes = plt.subplots(2, 3, figsize=(13, 7))
+    names = ("tau", "xi_e", "xi_e_r", "E_iso", "eps_e_r", "eps_B_r", "q_E_xir", "p_r")
+    fig, axes = plt.subplots(2, 4, figsize=(17, 7))
     for ax, name in zip(axes.flat, names):
-        v = np.log10(phys[name]) if name in ("tau", "E_iso") else phys[name]
+        if name == "q_E_xir":
+            v = np.log10(phys["E_iso"] * phys["xi_e_r"])
+        else:
+            v = np.log10(phys[name]) if name in ("tau", "E_iso") else phys[name]
         lo, hi = float(v.min()), float(v.max())
         ax.hist(v, bins=np.linspace(lo, hi if hi > lo else lo + 1e-9, 61), histtype="step", color="k")
-        ax.set_xlabel(f"log10 {name}" if name in ("tau", "E_iso") else name)
+        ax.set_xlabel("q_E_xir = log10(E_iso xi_e_r)" if name == "q_E_xir" else
+                      f"log10 {name}" if name in ("tau", "E_iso") else name)
     fig.tight_layout()
     fig.savefig(ckdir / "key_marginals.png", dpi=110)
     plt.close(fig)

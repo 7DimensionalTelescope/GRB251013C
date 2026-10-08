@@ -35,7 +35,7 @@ from grb.params import ENVIRONMENTS
 from grb.prior import ParamDefWithPrior
 from grb.plotting import plot_corner
 from early_phase_model import (  # noqa: F401  (log_probability, _sampled_bounds, param_label: re-exported for optimize_high_mode.py)
-    DEFAULT_ENVIRONMENT, HOST_AV_PARAM, PRIORS, XI_MODES, XRT_BAND,
+    DEFAULT_ENVIRONMENT, HOST_AV_PARAM, PRIORS, SAMPLING_COORDS, XI_MODES, XRT_BAND,
     _evaluate_fn, _init_early_phase_context, _sampled_bounds, build_model_from_params, load_fit_data,
     log_probability, make_fitter, make_param_defs, make_priors, model_spectral_index, param_defs_for_saved_result,
     param_label, xi_flags,
@@ -46,7 +46,7 @@ from early_phase_diagnostics import (
 )
 from early_phase_mcmc import (
     RUN_CONFIG_FILE, best_params_from_result, check_chain, print_parameter_table, resolve_nwalkers,
-    ridge_aware_initial_state, run_custom_emcee, run_production_mcmc, save_bestfit_params, save_result_arrays,
+    posterior_initial_state, ridge_aware_initial_state, run_custom_emcee, run_production_mcmc, save_bestfit_params, save_result_arrays,
 )
 from early_phase_plotting import plot_best_fit, plot_spectral_index_comparison
 
@@ -91,6 +91,8 @@ def parse_args():
     parser.add_argument("--final-check", action="store_true", help="With --check-chain: also print the automatic final recommendation.")
     parser.add_argument("--init-only", action="store_true", help="Production: build, check and save the ridge-aware initial ensemble, then exit (no sampling).")
     parser.add_argument("--log-every", type=int, default=500, help="Production: progress line in run.log every N steps (default: 500).")
+    parser.add_argument("--sampling-coords", choices=SAMPLING_COORDS, default="physical", help="Production: the sampler's coordinates. 'physical' (default) = the sampled parameters themselves; 'q_E_xir' = log10_E_iso replaced by q_E_xir = log10(E_iso * xi_e_r) (unit Jacobian, identical prior and likelihood; see early_phase_model). A resumed chain keeps its own coordinates.")
+    parser.add_argument("--init-from", nargs="+", default=None, metavar="DIR", help="Production: start the walkers from posterior draws (steps >= 50000) of these earlier production chains with the same prior, instead of the ridge-aware anchors.")
     parser.add_argument(
         "--use-spectral-index",
         default=True,
@@ -147,13 +149,17 @@ def run_production(args, param_defs, xi_mode, xrt_data, i_data, xrt_index_data, 
         context = (param_defs, xrt_data, i_data, xrt_index_data, args.spectral_index_cooling)
         _init_early_phase_context(context)
         with ProcessPoolExecutor(max_workers=args.npool, initializer=_init_early_phase_context, initargs=(context,)) as pool:
-            ridge_aware_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir)
+            if args.init_from:
+                posterior_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir, args.init_from)
+            else:
+                ridge_aware_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir)
         return
     run_config = {"prior": args.prior, "environment": args.environment, "xi": xi_mode, "param_kwargs": param_kwargs,
                   "command": " ".join(sys.argv), "cwd": os.getcwd()}
     run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, args.spectral_index_cooling, outdir,
                         nsteps=args.nsteps, nwalkers=args.nwalkers, npool=args.npool, seed=args.seed,
-                        resume=bool(args.resume), run_config=run_config, log_every=args.log_every)
+                        resume=bool(args.resume), run_config=run_config, log_every=args.log_every,
+                        sampling_coords=args.sampling_coords, init_from=args.init_from)
     print(f"Chain: {outdir / 'chain.h5'}; run checkpoint diagnostics with: --check-chain {outdir}")
 
 
