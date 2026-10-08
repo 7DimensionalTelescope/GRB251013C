@@ -39,11 +39,40 @@ from grb.utils import flux_error, model_array
 from spectral_index_interpolator import get_spectral_index_calculator
 
 I_DATA_ROWS = 40
-MODEL_RESOLUTION = (0.1, 0.25, 10)
+MODEL_RESOLUTION = (0.1, 0.25, 10)     # historical production default; a run may override it (set_numerics)
 MODEL_RTOL = 1e-5
 DEFAULT_ENVIRONMENT = "wind"
 XRT_BAND = (0.3 * keV, 10 * keV)
 HOST_AV_PARAM = "A_V"
+
+
+def set_numerics(resolution=None, rtol=None):
+    """Override the model resolution / tolerance for this process (None keeps the current value); returns both.
+
+    build_model_from_params reads the module globals at call time, so this must be called in every worker process
+    (early_phase_mcmc._init_mcmc_worker does it) as well as in the main process.
+    """
+    global MODEL_RESOLUTION, MODEL_RTOL
+    if resolution is not None:
+        MODEL_RESOLUTION = tuple(float(v) for v in resolution)
+    if rtol is not None:
+        MODEL_RTOL = float(rtol)
+    return MODEL_RESOLUTION, MODEL_RTOL
+
+
+def numerical_settings():
+    """Every numerical model setting a run depends on, for run_config.json."""
+    import VegasAfterglow
+    doc = Model.__init__.__doc__ or ""
+    return {
+        "model_resolution": list(MODEL_RESOLUTION), "model_rtol": MODEL_RTOL,
+        "radiative_fireball": "VegasAfterglow default, not overridden"
+                              + (" (True)" if "radiative_fireball: bool = True" in doc else " (default not verified)"),
+        "axisymmetric": "VegasAfterglow default, not overridden" + (" (True)" if "axisymmetric: bool = True" in doc else ""),
+        "jet": "TophatJet(spreading=True, duration=tau)", "radiation": "synchrotron only (ssc=False, kn=False)",
+        "xrt_band_points": 10,
+        "VegasAfterglow": getattr(VegasAfterglow, "__version__", "unknown"),
+    }
 
 
 def load_fit_data(include_spectral_index=False):

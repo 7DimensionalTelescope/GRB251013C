@@ -34,6 +34,7 @@ from grb.const import FIT_RESULTS_DIR
 from grb.params import ENVIRONMENTS
 from grb.prior import ParamDefWithPrior
 from grb.plotting import plot_corner
+import early_phase_model
 from early_phase_model import (  # noqa: F401  (log_probability, _sampled_bounds, param_label: re-exported for optimize_high_mode.py)
     DEFAULT_ENVIRONMENT, HOST_AV_PARAM, PRIORS, SAMPLING_COORDS, XI_MODES, XRT_BAND,
     _evaluate_fn, _init_early_phase_context, _sampled_bounds, build_model_from_params, load_fit_data,
@@ -92,7 +93,10 @@ def parse_args():
     parser.add_argument("--init-only", action="store_true", help="Production: build, check and save the ridge-aware initial ensemble, then exit (no sampling).")
     parser.add_argument("--log-every", type=int, default=500, help="Production: progress line in run.log every N steps (default: 500).")
     parser.add_argument("--sampling-coords", choices=SAMPLING_COORDS, default="physical", help="Production: the sampler's coordinates. 'physical' (default) = the sampled parameters themselves; 'q_E_xir' = log10_E_iso replaced by q_E_xir = log10(E_iso * xi_e_r) (unit Jacobian, identical prior and likelihood); 'u_r' = p_r replaced by u_r = log10(p_r - 2), with the log-Jacobian added so the uniform p_r prior is unchanged (see early_phase_model). A resumed chain keeps its own coordinates.")
-    parser.add_argument("--init-from", nargs="+", default=None, metavar="DIR", help="Production: start the walkers from posterior draws (steps >= 50000) of these earlier production chains with the same prior, instead of the ridge-aware anchors.")
+    parser.add_argument("--init-from", nargs="+", default=None, metavar="DIR", help="Production: start the walkers from posterior draws (steps in --init-window) of these earlier production chains with the same prior, instead of the ridge-aware anchors.")
+    parser.add_argument("--init-window", nargs=2, type=int, default=(50000, 0), metavar=("START", "END"), help="Steps [START, END) of the --init-from chains to draw from (END 0 = to the end; default 50000 0).")
+    parser.add_argument("--model-resolution", nargs=3, type=float, default=None, metavar=("PHI", "THETA", "T"), help="Model resolution for this run (default: early_phase_model.MODEL_RESOLUTION = (0.1, 0.25, 10), the historical production value). Recorded in run_config.json; --resume and --check-chain use the chain's own value.")
+    parser.add_argument("--model-rtol", type=float, default=None, help="Model rtol for this run (default: early_phase_model.MODEL_RTOL = 1e-5).")
     parser.add_argument(
         "--use-spectral-index",
         default=True,
@@ -148,9 +152,13 @@ def run_production(args, param_defs, xi_mode, xrt_data, i_data, xrt_index_data, 
         nwalkers = resolve_nwalkers(args.nwalkers, len(param_defs))
         context = (param_defs, xrt_data, i_data, xrt_index_data, args.spectral_index_cooling)
         _init_early_phase_context(context)
-        with ProcessPoolExecutor(max_workers=args.npool, initializer=_init_early_phase_context, initargs=(context,)) as pool:
+        from early_phase_mcmc import _init_mcmc_worker
+        numerics = (early_phase_model.MODEL_RESOLUTION, early_phase_model.MODEL_RTOL)
+        with ProcessPoolExecutor(max_workers=args.npool, initializer=_init_mcmc_worker,
+                                 initargs=(context, None, None, "physical", numerics)) as pool:
             if args.init_from:
-                posterior_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir, args.init_from)
+                posterior_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir, args.init_from,
+                                        discard=args.init_window[0], end=args.init_window[1] or None)
             else:
                 ridge_aware_initial_state(param_defs, nwalkers, np.random.default_rng(args.seed), pool.map, outdir)
         return
@@ -159,7 +167,8 @@ def run_production(args, param_defs, xi_mode, xrt_data, i_data, xrt_index_data, 
     run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, args.spectral_index_cooling, outdir,
                         nsteps=args.nsteps, nwalkers=args.nwalkers, npool=args.npool, seed=args.seed,
                         resume=bool(args.resume), run_config=run_config, log_every=args.log_every,
-                        sampling_coords=args.sampling_coords, init_from=args.init_from)
+                        sampling_coords=args.sampling_coords, init_from=args.init_from,
+                        init_window=(args.init_window[0], args.init_window[1] or None))
     print(f"Chain: {outdir / 'chain.h5'}; run checkpoint diagnostics with: --check-chain {outdir}")
 
 
@@ -176,6 +185,13 @@ def main():
         for key in ("tau_max", "eps_e_r_max", "eps_B_r_max", "p_min", "xi_e_r_min", "e_iso_max"):
             setattr(args, key, saved["param_kwargs"][key])
         args.outdir = args.resume
+        if args.model_resolution is not None or args.model_rtol is not None:
+            if (args.model_resolution is not None and [float(v) for v in args.model_resolution] != [float(v) for v in saved["model_resolution"]]) \
+                    or (args.model_rtol is not None and float(args.model_rtol) != float(saved["model_rtol"])):
+                raise ValueError(f"--resume keeps the chain's model resolution {saved['model_resolution']} / rtol "
+                                 f"{saved['model_rtol']}; a different value was given on the command line")
+        args.model_resolution, args.model_rtol = saved["model_resolution"], saved["model_rtol"]
+    early_phase_model.set_numerics(args.model_resolution, args.model_rtol)
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     diagnostic = (args.optimize_high_mode or args.optimize_low_mode or args.decompose_modes or args.optimize_profile_best
                   or args.optimize_constrained or args.optimize_free_xi_e_r)
@@ -218,7 +234,8 @@ def main():
         print(f"XRT spectral index points: {len(xrt_index_data['time'])}")
     print(f"Prior: {args.prior}, environment: {args.environment}, xi: {xi_mode if args.prior != 'wide' else 'wide prior (both free)'} "
           f"({len(param_defs)} free parameters)")
-    print(f"Sampler: {args.sampler}, npool={args.npool}")
+    print(f"Sampler: {args.sampler}, npool={args.npool}; model resolution {early_phase_model.MODEL_RESOLUTION}, "
+          f"rtol {early_phase_model.MODEL_RTOL:g}")
     if args.plot_from is None:
         print(f"Output directory: {outdir}")
     else:

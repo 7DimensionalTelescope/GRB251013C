@@ -23,11 +23,10 @@ from VegasAfterglow import Scale
 os.sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from grb.const import HOST_AV_LOG10_MEAN, HOST_AV_LOG10_SIGMA, XRT_FLARE_START_TIME
+import early_phase_model as epm
 from early_phase_model import (
     EPS_SUM_PAIRS,
     I_DATA_ROWS,
-    MODEL_RESOLUTION,
-    MODEL_RTOL,
     _init_early_phase_context,
     _log_probability_from_context,
     _sampled_bounds,
@@ -401,13 +400,13 @@ def ridge_aware_initial_state(param_defs, nwalkers, rng, map_func, outdir):
     return p0, lp0
 
 
-def posterior_initial_state(param_defs, nwalkers, rng, map_func, outdir, source_dirs, discard=50000):
+def posterior_initial_state(param_defs, nwalkers, rng, map_func, outdir, source_dirs, discard=50000, end=None):
     """Walkers drawn from the posterior already established by earlier production chains with the same prior.
 
     The ridge-aware strategy adapted to a known posterior: instead of hand-picked optima spread along the
     degeneracy, take nwalkers points from the post-discard part of each source chain (split evenly between the
     sources; distinct walkers within a source, random steps), converted to physical coordinates. Every point is
-    re-evaluated and must have finite log_probability.
+    re-evaluated and must have finite log_probability. The draws come from steps [discard, end) of every source.
     """
     import csv
 
@@ -424,7 +423,7 @@ def posterior_initial_state(param_defs, nwalkers, rng, map_func, outdir, source_
         if prior_key(make_param_defs(**config["param_kwargs"])) != prior_key(param_defs):
             raise ValueError(f"{source} was sampled with a different prior")
         reader = emcee.backends.HDFBackend(str(source / CHAIN_FILE), name="mcmc", read_only=True)
-        chain = from_sampling_coords(reader.get_chain(discard=discard), labels, config.get("sampling_coords", "physical"))
+        chain = from_sampling_coords(reader.get_chain()[discard:end], labels, config.get("sampling_coords", "physical"))
         walkers = rng.permutation(chain.shape[1])[:k]
         steps = rng.integers(0, chain.shape[0], k)
         for w, t in zip(walkers, steps):
@@ -442,7 +441,7 @@ def posterior_initial_state(param_defs, nwalkers, rng, map_func, outdir, source_
         writer.writeheader()
         writer.writerows({"walker": i, **r, "log_prob": lp, **dict(zip(labels, x))}
                          for i, (r, lp, x) in enumerate(zip(rows, lp0, p0)))
-    print(f"Initial ensemble: {nwalkers} posterior draws (steps >= {discard}) from " + ", ".join(
+    print(f"Initial ensemble: {nwalkers} posterior draws (steps {discard}-{end or 'end'}) from " + ", ".join(
         f"{Path(d).name}: {k}" for d, k in zip(source_dirs, per)))
     print_initial_ranges(p0, lp0, labels)
     q = np.log10(physical_columns(p0, labels)["E_iso"] * p0[:, labels.index("xi_e_r")])
@@ -480,8 +479,12 @@ _WORKER_ERROR_LOG = None
 _WORKER_COORDS = (None, "physical")         # (physical labels, sampling coordinates)
 
 
-def _init_mcmc_worker(context, error_log, labels=None, coords="physical"):
+def _init_mcmc_worker(context, error_log, labels=None, coords="physical", numerics=None):
+    """Pool-worker set-up: likelihood context, error log, sampling coordinates and (explicitly, independent of the
+    process start method) the model resolution / rtol of the run."""
     global _WORKER_ERROR_LOG, _WORKER_COORDS
+    if numerics is not None:
+        epm.set_numerics(*numerics)
     _init_early_phase_context(context)
     _WORKER_ERROR_LOG = error_log
     _WORKER_COORDS = (labels, coords)
@@ -508,6 +511,32 @@ CHAIN_FILE = "chain.h5"
 RUN_CONFIG_FILE = "run_config.json"
 
 
+def provenance():
+    """Code and environment identification recorded in run_config.json (git commit, package versions, host)."""
+    import platform
+    import subprocess
+    import sys
+
+    import h5py
+    import scipy
+    import VegasAfterglow
+    repo = Path(__file__).resolve().parent.parent
+
+    def git(*cmd):
+        try:
+            return subprocess.run(["git", *cmd], cwd=repo, capture_output=True, text=True, timeout=20).stdout.strip()
+        except Exception as exc:                       # git missing: record why instead of failing the run
+            return f"unavailable ({exc})"
+    return {
+        "git_commit": git("rev-parse", "HEAD"), "git_branch": git("rev-parse", "--abbrev-ref", "HEAD"),
+        "git_modified_tracked_files": git("status", "--porcelain", "--untracked-files=no").splitlines(),
+        "python": sys.version.split()[0], "python_executable": sys.executable, "numpy": np.__version__,
+        "scipy": scipy.__version__, "emcee": emcee.__version__, "h5py": h5py.__version__,
+        "VegasAfterglow": getattr(VegasAfterglow, "__version__", "unknown"), "VegasAfterglow_path": VegasAfterglow.__file__,
+        "platform": platform.platform(), "host": platform.node(), "OMP_NUM_THREADS": os.environ.get("OMP_NUM_THREADS"),
+    }
+
+
 def _write_json(path, payload):
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2, default=str) + "\n")
@@ -516,7 +545,7 @@ def _write_json(path, payload):
 
 def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_index_cooling, outdir, nsteps,
                         nwalkers=None, npool=20, seed=None, resume=False, run_config=None, log_every=500,
-                        sampling_coords="physical", init_from=None):
+                        sampling_coords="physical", init_from=None, init_window=(50000, None)):
     """emcee with the DE move mixture and an HDF backend; runs (or continues) the SAME chain to `nsteps` total steps.
 
     New run: ridge-aware start (or posterior draws from init_from chains), backend reset, run_config.json written.
@@ -542,6 +571,9 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
                              f"  saved: {config['labels']}\n  now:   {labels}")
         nwalkers = config["nwalkers"]
         sampling_coords = config.get("sampling_coords", "physical")
+        saved = (tuple(float(v) for v in config["model_resolution"]), float(config["model_rtol"]))
+        if (tuple(epm.MODEL_RESOLUTION), epm.MODEL_RTOL) != saved:
+            raise ValueError(f"Model resolution/rtol now {(epm.MODEL_RESOLUTION, epm.MODEL_RTOL)} differ from the chain's {saved}")
         if npool != config["npool"]:
             print(f"Note: resuming with {npool} workers (chain started with {config['npool']}).")
     else:
@@ -552,7 +584,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
         config = {
             **(run_config or {}), "labels": labels, "ndim": ndim, "nwalkers": nwalkers, "seed": seed, "npool": npool,
             "moves": MOVES_DESCRIPTION,
-            "initialisation": (f"posterior draws from {[str(d) for d in init_from]}" if init_from
+            "initialisation": (f"posterior draws from {[str(d) for d in init_from]}, steps {init_window[0]}-"
+                               f"{init_window[1] or 'end'}" if init_from
                                else "ridge-aware (RIDGE_ANCHORS + degeneracy ridge + jitter)"),
             "sampling_coords": sampling_coords, "sampling_labels": sampling_labels(labels, sampling_coords),
             "bounds": [{"name": p.name, "label": param_label(p), "lower": p.lower, "upper": p.upper,
@@ -560,7 +593,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
                         "gaussian_prior": p.get_prior_mean_sigma() if p.has_gaussian_prior() else None}
                        for p in param_defs],
             "physical_constraints": [f"{e} + {b} <= 1" for e, b in EPS_SUM_PAIRS],
-            "model_resolution": MODEL_RESOLUTION, "model_rtol": MODEL_RTOL,
+            "model_resolution": list(epm.MODEL_RESOLUTION), "model_rtol": epm.MODEL_RTOL,
+            "numerical_settings": epm.numerical_settings(), "provenance": provenance(),
             "spectral_index_cooling": spectral_index_cooling,
             "emcee_version": emcee.__version__, "backend": str(chain_path), "created": datetime.now().isoformat(),
             "segments": [], "total_steps": 0,
@@ -568,7 +602,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
 
     error_log = str(outdir / "worker_errors.log")
     with ProcessPoolExecutor(max_workers=npool, initializer=_init_mcmc_worker,
-                             initargs=(context, error_log, labels, sampling_coords)) as pool:
+                             initargs=(context, error_log, labels, sampling_coords,
+                                       (epm.MODEL_RESOLUTION, epm.MODEL_RTOL))) as pool:
         if resume:
             backend = emcee.backends.HDFBackend(str(chain_path), name="mcmc")
             if backend.shape != (nwalkers, ndim):
@@ -578,7 +613,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
         else:
             rng = np.random.default_rng(seed)
             if init_from:
-                initial, _ = posterior_initial_state(param_defs, nwalkers, rng, pool.map, outdir, init_from)
+                initial, _ = posterior_initial_state(param_defs, nwalkers, rng, pool.map, outdir, init_from,
+                                                     discard=init_window[0], end=init_window[1])
             else:
                 initial, _ = ridge_aware_initial_state(param_defs, nwalkers, rng, pool.map, outdir)
             initial = to_sampling_coords(initial, labels, sampling_coords)
@@ -603,7 +639,8 @@ def run_production_mcmc(param_defs, xrt_data, i_data, xrt_index_data, spectral_i
             sampler.random_state = np.random.RandomState(seed).get_state()
         print(f"Sampling: {nwalkers} walkers x {ndim} parameters, {npool} workers, steps {done} -> {nsteps}; "
               f"moves: {MOVES_DESCRIPTION}", flush=True)
-        segment = {"start_step": int(done), "target_step": nsteps, "npool": npool, "started": datetime.now().isoformat()}
+        segment = {"start_step": int(done), "target_step": nsteps, "npool": npool, "started": datetime.now().isoformat(),
+                   "provenance": provenance(), "model_resolution": list(epm.MODEL_RESOLUTION), "model_rtol": epm.MODEL_RTOL}
         t0 = time.time()
         last_acc = backend.accepted.copy()
         for k, state in enumerate(sampler.sample(initial, iterations=remaining, store=True, progress=False), start=1):
@@ -652,6 +689,8 @@ CONVERGED_TAU_MULTIPLE = 50          # N_postburn >= 50 tau_ac,max ...
 CONVERGED_TAU_STABILITY = 0.2        # ... with tau_ac,max changing < 20% between 75% and 100% of the post-burn chain
 CONVERGED_MEAN_SHIFT = 0.25          # every parameter's mean differs < 0.25 sigma between post-burn halves
 CONVERGED_LOGP_DRIFT = 1.0
+CONVERGED_WINDOW_SHIFT = 0.25        # every median within 0.25 sigma of the overall in each late window
+WINDOWS = 4                          # late windows for quantile / tail / ridge stability
 BOUND_FRACTION = 0.01                # "near a bound" = within min(1% of the sampled range, 0.5 sigma of the marginal),
 BOUND_SIGMA = 0.5                    # so a narrow interior peak close to a bound (p_r ~ 2.005) is not called a pile-up
 PILEUP_FRACTION = 0.05               # flagged when more than 5% of the samples sit in that edge zone
@@ -699,6 +738,7 @@ def check_chain(outdir, final=False):
     config = json.loads((outdir / RUN_CONFIG_FILE).read_text())
     labels = config["labels"]
     param_defs = make_param_defs(**config["param_kwargs"])
+    epm.set_numerics(config.get("model_resolution"), config.get("model_rtol"))   # plots use the chain's own settings
     if [param_label(p) for p in param_defs] != labels:
         raise ValueError("Parameter layout rebuilt from run_config.json differs from the saved labels.")
     bounds = _sampled_bounds(param_defs)
@@ -730,6 +770,9 @@ def check_chain(outdir, final=False):
         f"sampling coordinates {coords}")
     wall = sum(s["wall_seconds"] for s in config["segments"])
     say(f"wall-clock sampling time so far: {wall / 3600:.2f} h over {len(config['segments'])} segment(s)")
+    prov = config.get("provenance", {})
+    say(f"model resolution {tuple(epm.MODEL_RESOLUTION)}, rtol {epm.MODEL_RTOL:g}; code {prov.get('git_commit', 'not recorded')}; "
+        f"Python {prov.get('python', '?')}, NumPy {prov.get('numpy', '?')}")
 
     # numerical health
     n_nonfinite = int((~np.isfinite(chain_s)).sum())
@@ -849,10 +892,43 @@ def check_chain(outdir, final=False):
         f"{np.diff(np.percentile(ridge_product, [16, 84]))[0]:.3f} dex (log10 E_iso width "
         f"{np.diff(np.percentile(np.log10(phys['E_iso']), [16, 84]))[0]:.3f} dex)")
 
+    # physical-coordinate autocorrelation (differs from the sampled coordinates only where they are transformed)
+    if coords != "physical":
+        tau_phys = _autocorr(post)
+        say(f"autocorrelation time (physical coordinates): max {np.nanmax(tau_phys):.0f} ({labels[int(np.nanargmax(tau_phys))]}), "
+            f"median {np.nanmedian(tau_phys):.0f}; " + ", ".join(
+                f"{l} {tau_phys[labels.index(l)]:.0f}" for l in labels if sampling_labels(labels, coords)[labels.index(l)] != l))
+    else:
+        tau_phys = tau
+    # late-window stability: post-burn chain split into WINDOWS equal windows
+    win_edges = np.linspace(0, n_post, WINDOWS + 1).astype(int)
+    windows = list(zip(win_edges[:-1], win_edges[1:]))
+    win_dev = np.zeros((ndim, 3))
+    for j in range(ndim):
+        allq = np.percentile(post[..., j], [16, 50, 84])
+        sig = 0.5 * (allq[2] - allq[0])
+        wq = np.array([np.percentile(post[a:b, :, j], [16, 50, 84]) for a, b in windows])
+        win_dev[j] = np.abs(np.subtract(wq, allq)).max(0) / sig
+    say(f"late-window stability ({WINDOWS} post-burn windows of {n_post // WINDOWS} steps): max |window - overall| "
+        f"16/50/84% in units of the half-width; worst median {win_dev[:, 1].max():.2f} ({labels[int(win_dev[:, 1].argmax())]}), "
+        f"worst 16% {win_dev[:, 0].max():.2f}, worst 84% {win_dev[:, 2].max():.2f}")
+    say("  per parameter (16/50/84): " + ", ".join(f"{l} {d[0]:.2f}/{d[1]:.2f}/{d[2]:.2f}" for l, d in zip(labels, win_dev)))
+    pr_i = labels.index("p_r")
+    tail = [np.percentile(post[a:b, :, pr_i], [84, 97.5]) for a, b in windows]
+    say("p_r upper tail per window (84% / 97.5%): " + ", ".join(f"{t[0]:.4f}/{t[1]:.4f}" for t in tail))
+    e_i, xr_i = labels.index("log10_E_iso"), labels.index("xi_e_r")
+    ridge_w = []
+    for a, b in windows:
+        lq = np.add(post[a:b, :, e_i], np.log10(post[a:b, :, xr_i])).ravel()
+        ridge_w.append((np.median(lq), np.diff(np.percentile(lq, [16, 84]))[0],
+                        np.corrcoef(post[a:b, :, e_i].ravel(), post[a:b, :, xr_i].ravel())[0, 1]))
+    say("E_iso-xi_e_r ridge per window (median / 16-84 width of log10(E_iso xi_e_r), corr(log E_iso, xi_e_r)): "
+        + ", ".join(f"{r[0]:.3f}/{r[1]:.3f}/{r[2]:+.2f}" for r in ridge_w))
+
     # decision
     converged = (not serious and n_post >= CONVERGED_TAU_MULTIPLE * tau_max and tau_change < CONVERGED_TAU_STABILITY
                  and shift.max() < CONVERGED_MEAN_SHIFT and abs(lp_drift) < CONVERGED_LOGP_DRIFT
-                 and not len(frozen) and not len(isolated))
+                 and win_dev[:, 1].max() < CONVERGED_WINDOW_SHIFT and not len(frozen) and not len(isolated))
     code = EXIT_FAILURE if serious else EXIT_CONVERGED if converged else EXIT_CONTINUE
     say(f"serious problems: {serious or 'none'}")
     say(f"warnings: {warnings or 'none'}")
@@ -888,6 +964,10 @@ def check_chain(outdir, final=False):
         "tau_ac_max_at_50_75_100": [float(np.nanmax(tau_50)), float(np.nanmax(tau_75)), tau_max],
         "ess": dict(zip(slabels, ess.tolist())), "rhat_walkers": dict(zip(slabels, rhat.tolist())),
         "mean_shift_sigma": dict(zip(slabels, shift.tolist())), "log_prob_drift": lp_drift,
+        "tau_ac_physical": dict(zip(labels, tau_phys.tolist())),
+        "window_quantile_deviation_sigma": {l: d.tolist() for l, d in zip(labels, win_dev)},
+        "p_r_tail_per_window": [t.tolist() for t in tail], "ridge_per_window": [list(map(float, r)) for r in ridge_w],
+        "model_resolution": list(epm.MODEL_RESOLUTION), "model_rtol": epm.MODEL_RTOL,
         "best_log_prob": best_lp, "best_log_prob_post_burn": best_post_lp, "median_tau_s": tau_med_s, "frozen_walkers": frozen.tolist(),
         "isolated_walkers": isolated.tolist(), "boundary_pileups": pileups, "serious": serious, "warnings": warnings,
         "decision": verdict, "exit_code": code, "wall_seconds": wall,
