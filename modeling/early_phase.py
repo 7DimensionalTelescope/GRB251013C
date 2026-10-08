@@ -91,7 +91,7 @@ def parse_args():
     parser.add_argument("--final-check", action="store_true", help="With --check-chain: also print the automatic final recommendation.")
     parser.add_argument("--init-only", action="store_true", help="Production: build, check and save the ridge-aware initial ensemble, then exit (no sampling).")
     parser.add_argument("--log-every", type=int, default=500, help="Production: progress line in run.log every N steps (default: 500).")
-    parser.add_argument("--sampling-coords", choices=SAMPLING_COORDS, default="physical", help="Production: the sampler's coordinates. 'physical' (default) = the sampled parameters themselves; 'q_E_xir' = log10_E_iso replaced by q_E_xir = log10(E_iso * xi_e_r) (unit Jacobian, identical prior and likelihood; see early_phase_model). A resumed chain keeps its own coordinates.")
+    parser.add_argument("--sampling-coords", choices=SAMPLING_COORDS, default="physical", help="Production: the sampler's coordinates. 'physical' (default) = the sampled parameters themselves; 'q_E_xir' = log10_E_iso replaced by q_E_xir = log10(E_iso * xi_e_r) (unit Jacobian, identical prior and likelihood); 'u_r' = p_r replaced by u_r = log10(p_r - 2), with the log-Jacobian added so the uniform p_r prior is unchanged (see early_phase_model). A resumed chain keeps its own coordinates.")
     parser.add_argument("--init-from", nargs="+", default=None, metavar="DIR", help="Production: start the walkers from posterior draws (steps >= 50000) of these earlier production chains with the same prior, instead of the ridge-aware anchors.")
     parser.add_argument(
         "--use-spectral-index",

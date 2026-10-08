@@ -36,6 +36,7 @@ from early_phase_model import (
     param_label,
     physical_param_value,
     sampling_labels,
+    sampling_log_jacobian,
     to_sampling_coords,
 )
 from early_phase_optimize import find_start_point
@@ -487,12 +488,14 @@ def _init_mcmc_worker(context, error_log, labels=None, coords="physical"):
 
 
 def _mcmc_log_probability(params_array):
-    """Sampler coordinates -> physical sampled space (identity for "physical") -> the unchanged log_probability."""
+    """Sampler coordinates -> physical sampled space (identity for "physical") -> the unchanged log_probability,
+    plus the coordinate change's log-Jacobian (0 except for u_r), so the physical prior is unchanged."""
     labels, coords = _WORKER_COORDS
     try:
-        if coords != "physical":
-            params_array = from_sampling_coords(params_array, labels, coords)
-        return _log_probability_from_context(params_array)
+        if coords == "physical":
+            return _log_probability_from_context(params_array)
+        lp = _log_probability_from_context(from_sampling_coords(params_array, labels, coords))
+        return lp + sampling_log_jacobian(params_array, labels, coords) if np.isfinite(lp) else -np.inf
     except Exception as exc:
         if _WORKER_ERROR_LOG is not None:
             with open(_WORKER_ERROR_LOG, "a") as fh:
@@ -706,6 +709,9 @@ def check_chain(outdir, final=False):
     chain_s = reader.get_chain()                               # sampler coordinates: mixing diagnostics
     chain = from_sampling_coords(chain_s, labels, coords)      # physical coordinates: posterior summaries
     log_prob = reader.get_log_prob()
+    if coords != "physical":                                   # stored target includes the log-Jacobian: remove it
+        with np.errstate(invalid="ignore"):
+            log_prob = np.subtract(log_prob, sampling_log_jacobian(chain_s, labels, coords))
     n, nwalkers, ndim = chain.shape
     ckdir = outdir / "checkpoints" / f"step_{n:06d}"
     ckdir.mkdir(parents=True, exist_ok=True)

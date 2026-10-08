@@ -582,9 +582,16 @@ def posterior_decomposition(params_array, param_defs, xrt_data, i_data, xrt_inde
 #             still enforces the E_iso and xi_e_r box bounds on the reconstructed values. The map
 #             (log10_E_iso, xi_e_r) -> (q_E_xir, xi_e_r) has Jacobian determinant 1, so the prior measure (uniform in
 #             log10_E_iso, linear in xi_e_r) is exactly the same; q_E_xir has no box of its own.
+# "u_r":      p_r is replaced, in the same slot, by u_r = log10(p_r - 2) (p_r = 2 + 10**u_r). The physical prior on
+#             p_r (uniform between its bounds) is kept exactly by adding log|dp_r/du_r| = ln(ln 10) + u_r ln 10
+#             (sampling_log_jacobian) to the log target; the p_r bounds are still enforced by log_prior on the
+#             reconstructed p_r, so u_r runs over (log10(p_r_min - 2), log10(p_r_max - 2)] = (-inf, log10 1.5] for
+#             the production bounds [2, 3.5] (the 10**u_r Jacobian makes the open lower end integrable).
 # ---------------------------------------------------------------------------------------------------------------
-SAMPLING_COORDS = ("physical", "q_E_xir")
+SAMPLING_COORDS = ("physical", "q_E_xir", "u_r")
 Q_E_XIR = "q_E_xir"
+U_R = "u_r"
+_LN_LN10 = float(np.log(np.log(10.0)))
 
 
 def sampling_labels(labels, coords):
@@ -593,7 +600,21 @@ def sampling_labels(labels, coords):
         return list(labels)
     if coords == Q_E_XIR:
         return [Q_E_XIR if l == "log10_E_iso" else l for l in labels]
+    if coords == U_R:
+        if "p_r" not in labels:
+            raise ValueError("u_r coordinates need a free p_r")
+        return [U_R if l == "p_r" else l for l in labels]
     raise ValueError(f"sampling coordinates must be one of {SAMPLING_COORDS}, got {coords!r}")
+
+
+def sampling_log_jacobian(y, labels, coords):
+    """log |d(physical sampled vector) / d(sampler coordinates)| for vector(s) y (..., ndim): the term added to
+    log_probability so that the prior on the physical parameters is unchanged. 0 for "physical" and "q_E_xir"."""
+    y = np.asarray(y, dtype=float)
+    if coords == U_R:
+        return _LN_LN10 + y[..., labels.index("p_r")] * np.log(10.0)
+    sampling_labels(labels, coords)
+    return np.zeros(y.shape[:-1]) if y.ndim > 1 else 0.0
 
 
 def _q_indices(labels):
@@ -608,6 +629,11 @@ def to_sampling_coords(x, labels, coords):
     if coords == "physical":
         return y
     sampling_labels(labels, coords)
+    if coords == U_R:
+        pr_i = labels.index("p_r")
+        with np.errstate(divide="ignore", invalid="ignore"):
+            y[..., pr_i] = np.log10(np.subtract(y[..., pr_i], 2.0))
+        return y
     e_i, xi_i = _q_indices(labels)
     y[..., e_i] = y[..., e_i] + np.log10(y[..., xi_i])
     return y
@@ -620,6 +646,10 @@ def from_sampling_coords(y, labels, coords):
     if coords == "physical":
         return x
     sampling_labels(labels, coords)
+    if coords == U_R:
+        pr_i = labels.index("p_r")
+        x[..., pr_i] = np.add(2.0, np.power(10.0, x[..., pr_i]))
+        return x
     e_i, xi_i = _q_indices(labels)
     with np.errstate(divide="ignore", invalid="ignore"):
         x[..., e_i] = x[..., e_i] - np.log10(x[..., xi_i])
