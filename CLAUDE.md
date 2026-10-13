@@ -95,6 +95,70 @@ This is a research project fitting the multi-wavelength afterglow of GRB 251013C
   `--include-flare/--no-include-flare`, `--include-wing/--no-include-wing`,
   `--use-spectral-index/--no-use-spectral-index`. Note `--nwalkers` must be at least
   `2 * ndim` (52 for the 26-parameter model) or emcee rejects the initial state.
+- **Parameter-space exploration lives in the `grid_search/` directory** (like `modeling/`
+  below): `mixing_search.py` and `sweep_search.py` share helpers via `grid_search_common.py`
+  in the same folder, and each does `os.sys.path.append(os.path.join(os.path.dirname(__file__),
+  ".."))` so it can `import grb` (same trick `modeling/late_phase.py` uses). Run them from
+  within that directory:
+  ```bash
+  cd grid_search
+  /home/dtak/miniconda3/envs/grb251013c/bin/python mixing_search.py --ncpus 20
+  /home/dtak/miniconda3/envs/grb251013c/bin/python sweep_search.py --ncpus 20
+  ```
+- **Parameter-space exploration before MCMC ("mixing mode"):** `mixing_search.py` draws a
+  scrambled Sobol sequence over the existing prior box, scores every sample with the existing
+  `log_prior + log_likelihood` (one model evaluation per sample), and writes ranked results
+  plus a small plotted subset to
+  `/home/hongyp007/hongyp/projects/GRB/results/mixing_<timestamp>/`
+  (`results/samples.npz`, `results.csv`, `ranked_results.csv`, `plots/{best,broad,summary}/`,
+  `run_config.json`). Flags: `--nsamples --seed --ncpus --n-best-plots --n-broad-plots --outdir`
+  plus the same model flags as `fit_final_model.py`, and `--environment ism|wind|stratified`
+  (one medium per run; the run directory is `mixing_<environment>_<timestamp>`; media are
+  defined by `grb.params.medium_param_defs`). Unlike the MCMC, it rejects samples that
+  violate three coupled validity rules (approved 2026-08-23): `eps_e + eps_B <= 1` per shock
+  region, `theta_c_wing > theta_c_core`, `tau_decay_flare > tau_rise_flare`. Rejection happens
+  at generation time and rejected draws are replaced (and still recorded), so `--nsamples`
+  counts physically valid evaluated samples. Not a sampler and not an optimizer — the ranking
+  only locates starting regions for MCMC.
+- **Parameter sweeps (how the model changes as each parameter changes):** `sweep_search.py
+  [PARAM ...]` (no names = all parameters; `--sweep-nvalues`, default 15) holds every
+  parameter at a baseline (filtered to the current param defs, out-of-bounds values clipped
+  and missing ones set to the bounds midpoint — both recorded as notes) while one parameter
+  is varied across its full prior range. Baseline source is `INITIAL_GUESS` from
+  `fit_final_model.py` by default, or `--baseline-dir DIR` to use the best-fit sample from a
+  saved run directory instead (any dir with `samples.npy`/`log_probs.npy`/`labels.txt`, e.g. a
+  `fit_final_model.py` output dir under `projects/GRB/results/GRB251013C/` — loaded via
+  `grb.results.load_best_fit_params`, the same loader `grb/plotting.py` uses; full-precision,
+  unlike the 6-sig-fig `bestfit_params.txt`).
+  Writes `sweep_<environment>_<timestamp>/` with one
+  figure per parameter (`plots/sweep_<param>.png`: XRT + i-band light-curve families, plus a
+  7DT-spectrum-vs-wavelength panel at the median 7DT observation time, all three colored by
+  parameter value with the baseline in black; the spectrum panel is blank if there is no 7DT
+  data). Every swept value AND the baseline are further broken into forward-shock (dotted) and
+  reverse-shock (dash-dot) components in all three panels — same line-style convention as
+  `grb.plotting.render_light_curve_figure` (`'k:'` core FS, `'c-.'` reverse shock), but colored
+  by parameter value like the total curves so the FS/RS trend is visible too, not just the
+  total. Row-aligned `results/sweep_results.csv` + `results/sweep_curves.npz` (`{xrt,opt,sed}_
+  {total,fs,rs}` and `baseline_{xrt,opt,sed}_{,fs,rs}` arrays, plus `wavelength_grid` when 7DT
+  data exists), and `run_config.json`.
+  `log_likelihood`/`delta_logL` per point are still recorded in the CSV/npz (and the baseline
+  logL is shown in each figure's title) even though the ΔlogL panel itself was replaced by the
+  spectrum panel. Sweep points violating the coupled validity rules are marked
+  `physical_invalid` and skipped in the curve panels. Evaluation runs on a
+  `multiprocessing.Pool` (`--ncpus`).
+- **One hand-picked parameter set (not a scan):** `manual_model.py [--PARAM VALUE ...]`
+  evaluates a single model at manually-specified parameter values and plots it against all
+  data with the same 3-panel/component-breakdown style as `plot_light_curves`. Same baseline
+  convention as the sweep (`INITIAL_GUESS`, missing keys to the bounds midpoint), but CLI
+  overrides are **not** clipped to the prior box (only warned about) since the point is
+  unconstrained manual exploration; also warns (non-blocking) on the three coupled validity
+  rules. `--environment ism|wind|stratified`, `--include-flare/--include-wing` pick which
+  `--PARAM` flags exist (one per name in `grb.params.make_param_defs`). Writes
+  `manual_<environment>_<timestamp>/manual_lc.png` + `params_used.json` (values, sources,
+  validity warnings) under the same results root as the sweep, or `--outdir`. For interactive
+  work, `manual_model.ipynb` (same directory) imports `build_baseline`/`check_physical_validity`
+  from the script and exposes an `overrides = {...}` dict cell to edit values by hand and
+  re-render inline — run its kernel from this directory so `import grb`/`manual_model` resolve.
 - **Run the *other* phase scripts from the `modeling/` directory.** Each does
   `os.sys.path.append("..")` so it can `import grb`, and resolves plotting modules as
   same-dir imports:
@@ -139,7 +203,10 @@ Two layers, kept separate:
 - **`grb/modeling.py`** — `load_all_optical_data()` (XRT + every optical dataset the fit uses)
   and the model builders `make_core_model()` / `make_wing_model()`.
 - **`grb/params.py`** — `ParamDefWithPrior` (wraps VegasAfterglow's `ParamDef` to add a
-  Gaussian prior on top of the box bounds, used for host `A_V`) and `make_param_defs()`.
+  Gaussian prior on top of the box bounds, used for host `A_V`), `make_param_defs()` (takes
+  `environment="ism"|"wind"|"stratified"`, default `"ism"` = the historical set), and
+  `medium_param_defs()` (per-environment density parameters: `n_ism` / `A_star` /
+  `A_star`+`n_ism`+`n0` with `k_m` fixed at 2).
 - **`grb/likelihood.py`** — `log_probability` = `log_prior` + `log_likelihood`, plus
   `compute_model_flux_all_bands()` and the XRT spectral-index terms.
 - **`grb/spectral_index.py`** — Granot & Sari 2001 tooling (`load_xrt_spectral_index`,
@@ -147,8 +214,11 @@ Two layers, kept separate:
   the electron index `p` from the XRT photon index.
 - **`grb/results.py`** — run-artifact I/O: `save_run_arrays`, `save_bestfit_params`,
   `top_k_samples`, `latest_result_dir`, `load_best_fit_params`, `read_labels`.
-- **`grb/plotting.py`** — `plot_light_curves`, `plot_spectral_index_comparison`,
-  `plot_corner`, `compute_model_components`.
+- **`grb/plotting.py`** — `plot_light_curves` (loads a saved MCMC run dir, then delegates to
+  `render_light_curve_figure`), `render_light_curve_figure(params, include_flare, include_wing,
+  outfile, ...)` (the actual 3-panel/component-breakdown renderer, params-first so callers
+  without a saved run dir — e.g. `manual_model.py` — can drive it directly),
+  `plot_spectral_index_comparison`, `plot_corner`, `compute_model_components`.
 
 ### `fit_final_model.py` — the primary fit (repo root)
 
@@ -167,7 +237,15 @@ extrapolated to optical). Each component is a `VegasAfterglow.Model` (`ISM` medi
 The fit was built up in phases, each a self-contained script with a companion `*_plotting.py`.
 These import from `grb/` but still define their own model builders and likelihoods:
 
-- `early_phase.py` — core jet + reverse shock (early emission).
+- `early_phase.py` — core jet + reverse shock (early emission). Split 2026-10-08: `early_phase.py` is CLI/dispatch
+  only; `early_phase_model.py` is the single model / prior / physical-constraint / likelihood implementation
+  (`--prior final|wide|production`, `--xi both|reverse|none`); `early_phase_optimize.py` (robust optimisers),
+  `early_phase_diagnostics.py` (tau/p/xi/E_iso profiles), `early_phase_mcmc.py` (legacy sampler + production
+  sampler: DE moves, ridge-aware start, HDF `chain.h5` with `--resume DIR`, `--check-chain DIR`).
+  `run_early_phase_mcmc_overnight.sh OUTDIR` drives 30k→60k→≤100k steps autonomously. After touching the model run
+  `modeling/test/test_early_phase_refactor_equivalence.py` (bit-identity vs the frozen pre-split file) and
+  `modeling/test/verify_production_config.py`. On this machine the working interpreter is
+  `/home/hongyp007/anaconda3/envs/yp/bin/python` (the `grb251013c` path above does not exist here).
 - `partial_data.py` — core + Norris flare + wing on XRT + i-band.
 - `late_phase.py` — wing jet for late-time emission.
 
