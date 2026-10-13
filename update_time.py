@@ -2,8 +2,13 @@ import numpy as np
 import os
 from grb.io import read_data
 from grb.const import TRIGGER_TIME,DATA_DIR
+from grb.utils import heliocentric_correction_seconds
 from datetime import datetime, timedelta
 from astropy.time import Time
+
+# Facilities whose circular quotes heliocentric times (HJD). GCN 42333 (Leavitt)
+# gives HJD; read as JD/UTC it would be ~7 min (413 s) late at this position.
+HJD_FACILITIES = ("Leavitt",)
 
 if __name__ == "__main__":
     filename = os.path.join(DATA_DIR, "raw_data.xlsx")
@@ -42,6 +47,9 @@ if __name__ == "__main__":
         name = name.replace("\xa0", "")
         name = name.replace(" ", "")
         name = name.replace('"', "")
+
+        if name in HJD_FACILITIES:
+            time = time - timedelta(seconds=float(heliocentric_correction_seconds(time)))
 
         if isinstance(val, str) and ">" in val:
             val = float(val.replace(">", ""))

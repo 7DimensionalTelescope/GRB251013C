@@ -12,8 +12,9 @@ this folder; scripts remain runnable as-is (they point at the worktree
   (physicist / data-analyst / consistency / logic / GRB expert). Section 4 is
   the concrete next-generation fit specification; Section 3 lists method traps.
 - **`reports/leavitt_zp_fix.patch`** — the Leavitt Vega/AB zero-point bug fix
-  for `grb/utils.py` (Rc/Ic fitted 0.179/0.384 mag too bright). **NOT applied**
-  — coordinate with the in-flight uncommitted edits in the main checkout.
+  for `grb/utils.py` (Rc/Ic fitted 0.179/0.384 mag too bright). **Applied to the
+  main checkout on 2026-10-13** (with a 0.05 mag error floor and the Leavitt
+  HJD→UTC −413 s correction); kept here for provenance.
 - **`reports/analyst_late_README.md`** — provenance of the late-time photometry
   CSVs. `reports/team_brief.md` is the original team charter.
 

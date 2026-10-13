@@ -48,6 +48,11 @@ XRT_EXCLUDE_TIME_RANGE = (3e3, 1e4)
 XRT_FLARE_START_TIME = 3e3
 XRT_FLARE_END_TIME = 1e4
 
+# Photometric calibration floor applied to every magnitude error before the
+# mag -> flux conversion (small-telescope GCN errors of 0.01-0.02 mag are
+# statistical only; see analysis/2026-08_core_flare_team/reports/team_synthesis.md).
+MAG_ERROR_FLOOR = 0.05
+
 # Log10 Gaussian prior on host-galaxy A_V.
 HOST_AV_LOG10_MEAN = -0.82
 HOST_AV_LOG10_SIGMA = 0.41

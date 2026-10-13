@@ -1,0 +1,26 @@
+=== XRT photon index Gamma (weighted mean) ===
+segment                                             Gamma  scatter   chi2/dof  n
+X1  first orbit 0.45-1.9 ks (pre-flare)      1.89 +/- 0.04     0.11    7.3/27   28
+    flare block 5.2-5.6 ks (excluded)        1.57 +/- 0.06     0.15    5.5/14   15
+X2  late 1.4e5-4.1e5 s                       1.82 +/- 0.18     0.00    0.0/1    2
+X1+X2 all non-flare                          1.89 +/- 0.04     0.10    7.4/29   30
+   (beta = Gamma - 1 ; F_nu ∝ nu^-beta)
+
+=== X-ray temporal index alpha (F ∝ t^-alpha) ===
+segment                                             alpha   chi2/dof  n
+X1  first orbit (pre-flare)                  1.09 +/- 0.10   23.6/26   28
+X2  late, after flare (2 pts)                1.17 +/- 0.38    0.0/0    2
+X1+X2 single PL, flare excluded              1.04 +/- 0.03   24.0/28   30
+
+=== Optical temporal index alpha (NUTTelA-TAO i-band) ===
+segment                                             alpha   chi2/dof  n
+O1  initial decay                            0.88 +/- 0.04   50.2/18   20
+O2  plateau                                  0.06 +/- 0.05   14.7/12   14
+O3  pre-hump decay                           1.08 +/- 0.07   12.9/11   13
+O4  post-hump decay (i only)                 1.58 +/- 0.06   45.4/10   12
+O4  post-hump, Leavitt_Rc alone              1.23 +/- 0.02   67.1/33   35
+O4  post-hump, Leavitt_Ic alone              1.12 +/- 0.07   51.0/16   18
+O4  joint 5-25 ks: i+Rc+Ic+7DT(r,i), free norms   1.26 +/- 0.02  193.7/61   67
+
+Excluded from decay fits: XRT flare block 5.2-5.6 ks; optical hump 1.5-5 ks.
+Errors are 1-sigma from weighted least squares (absolute errors); chi2/dof >> 1 means the segment is not a clean power law.

@@ -95,6 +95,16 @@ This is a research project fitting the multi-wavelength afterglow of GRB 251013C
   `--include-flare/--no-include-flare`, `--include-wing/--no-include-wing`,
   `--use-spectral-index/--no-use-spectral-index`. Note `--nwalkers` must be at least
   `2 * ndim` (52 for the 26-parameter model) or emcee rejects the initial state.
+- **Plot-only drivers at the repo root:** `plot_final_model.py [result_dir]` regenerates
+  the light-curve/spectral-index figures for a saved `final_*` run (defaults to the latest).
+  `plot_mwl_lc.py` draws the paper-style multi-wavelength light curve with an XRT
+  photon-index panel: `--fit-only` shows exactly the datasets `load_all_optical_data()`
+  feeds the fit (with per-dataset scale offsets and fitted power laws), without it every
+  GCN photometry point + Chandra + radio (colour = band, marker = telescope).
+  `lc_indices.py` fits segment power laws (alpha) and the mean XRT photon index and renders
+  a check figure; `closure_test.py` compares those alpha/beta with the standard closure
+  relations; `plot_cr.py` draws the alpha-beta plane using `cr_plot()` from the user's
+  `~/script/grbpy` package (outside this repo). All write to `figures/`.
 - **Run the *other* phase scripts from the `modeling/` directory.** Each does
   `os.sys.path.append("..")` so it can `import grb`, and resolves plotting modules as
   same-dir imports:
@@ -109,8 +119,10 @@ This is a research project fitting the multi-wavelength afterglow of GRB 251013C
   that render PNGs (jet break, spreading, narrow jet, smooth spectral index); run them
   directly, there is no pytest harness. The one exception is
   `modeling/test/test_refactor_equivalence.py`, which asserts the `grb` package still
-  reproduces the pre-refactor scripts bit-for-bit — run it after touching anything under
-  `grb/` or `fit_final_model.py`:
+  reproduces the pre-refactor scripts bit-for-bit (it materialises the baseline from git
+  commit `a40dd20`). **It has been failing since the bounds retune (`theta_c_core` upper
+  bound 0.08 → 1.0) and, since the 2026-10-13 data corrections, the data-loading comparisons
+  differ by design** — treat it as a historical harness, not a gate:
   ```bash
   /home/dtak/miniconda3/envs/grb251013c/bin/python modeling/test/test_refactor_equivalence.py
   ```
@@ -121,6 +133,10 @@ Two layers, kept separate:
 
 ### `grb/` — reusable data pipeline (import as a package)
 
+- **`update_time.py`** (repo root) regenerates `data/circular.xlsx` from the hand-maintained
+  `data/raw_data.xlsx` (GCN photometry): parses the mixed date formats, normalises facility
+  names, splits upper limits, and converts HJD-quoted facilities (`HJD_FACILITIES`) to UTC.
+  Re-run it after editing `raw_data.xlsx`; never edit `circular.xlsx` by hand.
 - **`grb/io.py`** is the entry point: `read_data(keyword, correct_galactic_extinction=, add_converted_flux=)` dispatches by keyword (`"xrt"`, `"i_data"`, `"circular"`, `"sdt"`,
   `"xrt_index"`) to the right file in `data/` with the right column schema, sorts by time,
   and optionally applies galactic-extinction correction and mag→flux conversion. `filter_data()`
@@ -138,8 +154,19 @@ Two layers, kept separate:
   `model_array()` (normalizes VegasAfterglow output objects, `.total`/`.sync`+`.ssc`, to arrays).
 - **`grb/modeling.py`** — `load_all_optical_data()` (XRT + every optical dataset the fit uses)
   and the model builders `make_core_model()` / `make_wing_model()`.
-- **`grb/params.py`** — `ParamDefWithPrior` (wraps VegasAfterglow's `ParamDef` to add a
-  Gaussian prior on top of the box bounds, used for host `A_V`) and `make_param_defs()`.
+- **`grb/prior.py`** — `ParamDefWithPrior` (wraps VegasAfterglow's `ParamDef` to add a
+  Gaussian prior on top of the box bounds, used for host `A_V`) plus default bounds/priors
+  for the empirical curve-fit models. **`grb/params.py`** imports it and defines
+  `make_param_defs()` — the MCMC parameter box lives there.
+- **`grb/vegas_compat.py`** — import-for-side-effect patch that makes VegasAfterglow 2.0.6's
+  `AfterglowLikelihood` thread-safe for bilby samplers with `npool > 1`. Only the
+  notebooks' bilby path needs it; the emcee drivers don't.
+- **Notebook-side empirical fitting** (not used by the MCMC drivers): `grb/fit.py`
+  (`Fitter` base with scipy/bilby backends) → `grb/analysis.py` (`Analyzer`, masks data and
+  fits light curves or SEDs), with shapes in `grb/functions.py` (power laws, broken power
+  laws, `norris_flare` — the latter *is* shared with the final model's flare), and plotting
+  helpers in `grb/lightcurve.py` / `grb/sed.py`. Consumers are `run.ipynb` and
+  `spectrum.ipynb`.
 - **`grb/likelihood.py`** — `log_probability` = `log_prior` + `log_likelihood`, plus
   `compute_model_flux_all_bands()` and the XRT spectral-index terms.
 - **`grb/spectral_index.py`** — Granot & Sari 2001 tooling (`load_xrt_spectral_index`,
@@ -170,6 +197,8 @@ These import from `grb/` but still define their own model builders and likelihoo
 - `early_phase.py` — core jet + reverse shock (early emission).
 - `partial_data.py` — core + Norris flare + wing on XRT + i-band.
 - `late_phase.py` — wing jet for late-time emission.
+- `map_core_xrt_pl.py` — no-MCMC Latin-hypercube/branch grid of the core forward-shock
+  parameters against XRT flux + spectral index only (seeds in `corexrt_seeds.json`).
 
 **MCMC pattern** (consistent across scripts): `log_probability = log_prior + log_likelihood`,
 where the likelihood is a χ² over XRT plus each optical dataset separately. LOG-scale
@@ -196,4 +225,14 @@ containing `samples.npy`, `log_probs.npy`, `labels.txt`, `top_k_params.npy`,
 - Time is seconds from `TRIGGER_TIME`; `date_obs` strings are converted with the trigger.
 - Known issues that alter fit numerics are catalogued, not fixed, in
   `docs/superpowers/reports/2026-07-27-fragmentation-audit.md` — read it before changing
-  extinction, the `A_V` prior, or `INITIAL_GUESS`.
+  extinction, the `A_V` prior, or `INITIAL_GUESS`. The refactor design/plan behind the
+  `grb/` package is in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
+- **`analysis/2026-08_core_flare_team/`** is the archived core+flare (no-wing) team
+  exploration — start at its `README.md`, then `reports/team_synthesis.md` (Section 4 is the
+  next-generation fit spec). It also holds fit-ready external data (Chandra, radio, late GCN
+  optical). Its `reports/leavitt_zp_fix.patch` (Vega/AB zero-point fix) **was applied on
+  2026-10-13** together with a `MAG_ERROR_FLOOR = 0.05` mag calibration floor
+  (`grb/const.py`, applied in `mag_to_flux_mJy`) and a Leavitt HJD→UTC time correction
+  (`HJD_FACILITIES` in `update_time.py`, −413 s; GCN 42333 quotes HJD). Fit results saved
+  before that date used the old, brighter Leavitt fluxes. The archive's scripts point at the
+  `.claude/worktrees/retune-on-refactor` checkout for `grb`.
