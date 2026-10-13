@@ -94,7 +94,20 @@ This is a research project fitting the multi-wavelength afterglow of GRB 251013C
   Its flags: `--nsteps`, `--nwalkers`, `--ncpus`, `--outdir`,
   `--include-flare/--no-include-flare`, `--include-wing/--no-include-wing`,
   `--use-spectral-index/--no-use-spectral-index`. Note `--nwalkers` must be at least
-  `2 * ndim` (52 for the 26-parameter model) or emcee rejects the initial state.
+  `2 * ndim` or emcee rejects the initial state.
+  **Added 2026-10-13:** `--second-component` (slow second jet component with opened wing
+  bounds, meant for the ~2 ks optical hump), `--flare-xray-only` (Norris component acts in
+  the XRT band only, no optical extrapolation), `--medium ism|wind` (wind replaces `n_ism`
+  by `A_star`), `--xray-extra` (EP-FXT, Chandra, XRT 3σ upper limit from
+  `data/xray_extra.csv`), `--late-optical` (`data/late_optical.csv`, t ≤ `LATE_OPTICAL_TMAX`),
+  `--preoptimize N` (LHS + Powell walker seeding for models with a rough `INITIAL_GUESS`).
+  The run directory records its options in `fit_config.json`, which the plotter reads back.
+  The best configuration so far is the hybrid
+  `--include-flare --flare-xray-only --second-component --medium wind --xray-extra --late-optical --preoptimize 4000`
+  (run `final_xflare_second_wind_20261013_195546`, total χ² 2072 vs 3808 for the old flare
+  model on the same data; see `score_runs.py` for the apples-to-apples scorer).
+- **`score_runs.py`** re-scores any saved runs on the identical extended dataset (per-dataset
+  χ²); use it instead of comparing `Best log probability` across runs fitted to different data.
 - **Plot-only drivers at the repo root:** `plot_final_model.py [result_dir]` regenerates
   the light-curve/spectral-index figures for a saved `final_*` run (defaults to the latest).
   `plot_mwl_lc.py` draws the paper-style multi-wavelength light curve with an XRT

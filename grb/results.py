@@ -94,7 +94,7 @@ def save_bestfit_params(outdir, labels, param_defs, top_params, top_log_probs,
     if model_description is None:
         parts = ["Core+RS"]
         if any("t_start_flare" in l for l in labels):
-            parts.append("Norris flare")
+            parts.append("Norris flare" + ("" if any("flare_beta" in l for l in labels) else " (X-ray only)"))
         if any("E_iso_wing" in l for l in labels):
             parts.append("second component (wing jet)")
         model_description = " + ".join(parts) + (" | wind medium" if any("A_star" in l for l in labels) else "")

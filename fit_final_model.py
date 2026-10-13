@@ -93,6 +93,8 @@ def parse_args(argv=None):
     parser.add_argument("--second-component", default=False, action=argparse.BooleanOptionalAction,
                         help="Slow second component (opened wing-jet bounds) instead of the Norris flare")
     parser.add_argument("--medium", choices=("ism", "wind"), default="ism")
+    parser.add_argument("--flare-xray-only", default=False, action=argparse.BooleanOptionalAction,
+                        help="Norris component acts in the XRT band only (no optical extrapolation)")
     parser.add_argument("--xray-extra", default=False, action=argparse.BooleanOptionalAction,
                         help="Add EP-FXT, Chandra and the XRT 3-sigma upper limit (data/xray_extra.csv)")
     parser.add_argument("--late-optical", default=False, action=argparse.BooleanOptionalAction,
@@ -229,6 +231,7 @@ def main(argv=None):
         cal_uncert=args.cal_uncert,
         second_component=args.second_component,
         medium=args.medium,
+        flare_xray_only=args.flare_xray_only,
     )
     print(f"Second component: {args.second_component} | medium: {args.medium} | "
           f"xray_extra: {args.xray_extra} ({len(xrt_data['ul_time'])} UL) | late_optical: {args.late_optical}")
@@ -273,7 +276,7 @@ def main(argv=None):
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     phase_name = "final"
     if args.include_flare:
-        phase_name += "_flare"
+        phase_name += "_xflare" if args.flare_xray_only else "_flare"
     if args.second_component:
         phase_name += "_second"
     elif args.include_wing:

@@ -100,9 +100,10 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
 
     # XRT band flux of core (+ wing + flare) at an ascending time array
     def xray_total(times):
-        flux = model_array(core_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total).copy()
+        times = np.atleast_1d(np.asarray(times, dtype=float))
+        flux = np.atleast_1d(model_array(core_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total)).astype(float).copy()
         if wing_model:
-            flux += model_array(wing_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total)
+            flux += np.atleast_1d(model_array(wing_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total))
         if include_flare and "t_start_flare" in params:
             flux += norris_flare(times, params["t_start_flare"], params["tau_rise_flare"],
                                  params["tau_decay_flare"], params["A_flare"])
@@ -131,8 +132,8 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
             opt_wing = wing_model.flux_density(times, nu_array)
             opt_flux += model_array(opt_wing.total)
 
-        # Flare contribution (with spectral scaling)
-        if include_flare and "t_start_flare" in params:
+        # Flare contribution (with spectral scaling); absent flare_beta => X-ray-only flare
+        if include_flare and "t_start_flare" in params and "flare_beta" in params:
             # XRT band for normalization
             nu_xrt_min = XRT_NU_LO
             nu_xrt_max = XRT_NU_HI

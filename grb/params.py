@@ -31,7 +31,7 @@ def dataset_cal_factor(params, dataset_name):
 
 
 def make_param_defs(include_flare=True, include_wing=True, include_cal=False, cal_uncert=0.1,
-                    second_component=False, medium="ism"):
+                    second_component=False, medium="ism", flare_xray_only=False):
     """Parameter definitions
 
     Bounds retuned (2026-07-30) from the joint re-optimization of the
@@ -92,7 +92,16 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
         ),
     ]
 
-    if include_flare:
+    if include_flare and flare_xray_only:
+        # X-ray-only late-activity component (no optical extrapolation, so no flare_beta);
+        # must still be high at the EP-FXT epoch (7.2 ks) and gone by ~1e5 s.
+        params.extend([
+            ParamDefWithPrior("t_start_flare", 1000, 6000, Scale.LOG),
+            ParamDefWithPrior("tau_rise_flare", 10, 3000, Scale.LOG),
+            ParamDefWithPrior("tau_decay_flare", 500, 50000, Scale.LOG),
+            ParamDefWithPrior("A_flare", 1e-10, 5e-9, Scale.LOG),
+        ])
+    elif include_flare:
         params.extend([
             ParamDefWithPrior("t_start_flare", 1000, 5000, Scale.LOG), 
             ParamDefWithPrior("tau_rise_flare", 10, 2000, Scale.LOG), 
