@@ -27,8 +27,9 @@ SEGMENTS_OPT = {
     "O1  initial decay":                  (90, 300),
     "O2  plateau":                        (300, 700),
     "O3  pre-hump decay":                 (700, 1500),
-    "O4  post-hump decay (i only)":       (5000, 11000),
+    "O4  post-hump steep (i, 6.7-10.8 ks)": (6700, 11000),
 }
+POST_HUMP_I = (6700, 11000)      # last clean single-power-law run of the i-band (posthump_backward.py)
 JOINT_POST = (5000, 25000)   # i + Leavitt Rc/Ic + 7DT r,i, common alpha, free normalisations
 EXCLUDED_X, EXCLUDED_OPT = (5000, 6000), (1500, 5000)
 
@@ -158,7 +159,7 @@ def main():
                   mew=0.3, elinewidth=0.7, capsize=0, label="NUTTelA-TAO i")
     ax_o.axvspan(*EXCLUDED_OPT, color="gray", alpha=0.15, lw=0)
     ax_o.text(np.sqrt(np.prod(EXCLUDED_OPT)), 0.7, "hump\n(excluded)", ha="center", fontsize=9, color="gray")
-    for (name, r), ty in zip(((k, v) for k, v in fo.items() if k.startswith("O")), (1.8, 1.6, 1.8, 1.8)):
+    for (name, r), ty in zip(((k, v) for k, v in fo.items() if k[:2] in ("O1", "O2", "O3", "O4")), (1.8, 1.6, 1.8, 1.8)):
         draw_fit(ax_o, r, color="black", label=name[:2], ty=ty)
     ax_o.set_ylabel("Flux density [mJy]")
     ax_o.set_title("Optical i-band: segment fits O1–O4", fontsize=12)
@@ -169,7 +170,7 @@ def main():
         dd = ds[key]; m = dd["time"] >= 4000
         ax_j.errorbar(dd["time"][m], dd["flux_mJy"][m], yerr=dd["flux_err"][m], fmt=MARKERS[key], ms=7 if key.startswith("7DT") else 4.5,
                       color=COLORS[key], mec="black", mew=0.3, elinewidth=0.7, capsize=0, label=key.replace("_", " "))
-    draw_fit(ax_j, fo["O4  post-hump decay (i only)"], color=COLORS["i-band"], label="i only", ty=1.7)
+    draw_fit(ax_j, fo["O4  post-hump steep (i, 6.7-10.8 ks)"], color=COLORS["i-band"], label="i steep", ty=1.7)
     draw_fit(ax_j, fo["Leavitt_Rc"], color=COLORS["Leavitt_Rc"], label="Rc alone", ty=0.45)
     draw_fit(ax_j, fo["Leavitt_Ic"], color=COLORS["Leavitt_Ic"], label="Ic alone", ty=1.8)
     tt = np.geomspace(*JOINT_POST, 50)

@@ -27,7 +27,7 @@ from grb.io import read_data
 from grb.modeling import load_all_optical_data
 from grb.spectral_index import load_xrt_spectral_index
 from grb.utils import seconds_from_trigger
-from lc_indices import fit_alpha, mean_gamma, _sel
+from lc_indices import fit_alpha, mean_gamma, _sel, POST_HUMP_I
 
 XRAY_NONFLARE = ((400, 2000), (1e5, 5e5))   # XRT segments used for alpha and <Gamma> (flare block excluded)
 
@@ -142,7 +142,7 @@ def fit_points():
         band = band_of(2.99792458e17 / d["frequency"])
         for t, f, e in zip(d["time"], d["flux_mJy"], d["flux_err"]):
             rows.append(dict(time=t, nu=d["frequency"], flux_mJy=f, err_mJy=e, ul=False, band=band,
-                             facility=fac, series=series))
+                             facility=fac, series=series, name=d["name"]))
     return pd.DataFrame(rows)
 
 
@@ -153,12 +153,12 @@ def _alpha_fit(t, f, e, mask=None):
     return rf"  ($\alpha$ = {r['alpha']:.2f} ± {r['err']:.2f})", r
 
 
-def _draw_pl(ax, r, color, scale=1.0, extend=1.3, lw=2.2, zorder=5):
+def _draw_pl(ax, r, color, scale=1.0, extend=1.3, lw=2.2, zorder=5, ls="-"):
     """Fitted power law: solid over the fit range, dashed a little beyond it."""
     t0, t1 = r["trange"]
     f = lambda t: scale * 10 ** r["b"] * t ** (-r["alpha"])
     tt = np.geomspace(t0, t1, 50)
-    ax.plot(tt, f(tt), color=color, lw=lw, zorder=zorder)
+    ax.plot(tt, f(tt), color=color, lw=lw, ls=ls, zorder=zorder)
     for a, b in ((t0 / extend, t0), (t1, t1 * extend)):
         tt = np.geomspace(a, b, 10)
         ax.plot(tt, f(tt), color=color, lw=lw * 0.7, ls="--", zorder=zorder)
@@ -183,6 +183,11 @@ def plot_fit_series(ax, opt, xrt):
             tag, r = _alpha_fit(g["time"], g["flux_mJy"], g["err_mJy"])
             label = label + tag
             _draw_pl(ax, r, color, scale=k * 1e-26 * float(g["nu"].iloc[0]))
+        if key == "i-band":
+            nu_i = float(g["nu"].iloc[0])
+            tag, r = _alpha_fit(g["time"], g["flux_mJy"], g["err_mJy"], _sel(g["time"].to_numpy(float), POST_HUMP_I))
+            label = label + tag.replace(")", ", 6.7–10.8 ks)")
+            _draw_pl(ax, r, color, scale=k * 1e-26 * nu_i)
         label = label + _scale_tag(k)
         if key == "7DT":
             t = np.median(g["time"]); y = np.median(g["nuFnu"])
@@ -190,14 +195,15 @@ def plot_fit_series(ax, opt, xrt):
             ax.errorbar(t, y, yerr=[[y - lo], [hi - y]], fmt=mk, ms=14, color=color, mec="black", mew=0.5,
                         elinewidth=1.2, capsize=3, zorder=6)
             ax.axvline(t, color=color, ls="--", lw=1.2, alpha=0.8, zorder=1)
-            ax.text(t * 1.08, 0.03, "7DT obs.", color=color, ha="left", va="bottom", fontsize=15, rotation=90,
+            ax.text(t * 1.08, 0.97, "7DT obs.", color=color, ha="left", va="top", fontsize=15, rotation=90,
                     transform=mtransforms.blended_transform_factory(ax.transData, ax.transAxes))
         else:
             ax.errorbar(g["time"], g["nuFnu"], yerr=g["nuFnu_err"], fmt=mk, ms=6, color=color, mec="black",
                         mew=0.3, elinewidth=0.7, capsize=0, alpha=0.9, zorder=3)
         handles.append(Line2D([], [], ls="", marker=mk, color=color, mec="black", mew=0.3,
                               ms=12 if mk == "*" else 6, label=label))
-    ax.legend(handles=handles, loc="lower left", frameon=False)
+    ax.set_ylim(2e-16, ax.get_ylim()[1])   # room for the legend below the data
+    ax.legend(handles=handles, loc="lower left", frameon=False, fontsize=13)
 
 
 def host_av():

@@ -17,7 +17,7 @@ segment                                             alpha   chi2/dof  n
 O1  initial decay                            0.88 +/- 0.04   50.2/18   20
 O2  plateau                                  0.06 +/- 0.05   14.7/12   14
 O3  pre-hump decay                           1.08 +/- 0.07   12.9/11   13
-O4  post-hump decay (i only)                 1.58 +/- 0.06   45.4/10   12
+O4  post-hump steep (i, 6.7-10.8 ks)         2.46 +/- 0.16    4.4/6    8
 O4  post-hump, Leavitt_Rc alone              1.23 +/- 0.02   67.1/33   35
 O4  post-hump, Leavitt_Ic alone              1.12 +/- 0.07   51.0/16   18
 O4  joint 5-25 ks: i+Rc+Ic+7DT(r,i), free norms   1.26 +/- 0.02  193.7/61   67

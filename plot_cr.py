@@ -21,7 +21,7 @@ from efs_cr_test import cr_plot  # noqa: E402
 
 from grb.modeling import load_all_optical_data  # noqa: E402
 from grb.spectral_index import load_xrt_spectral_index  # noqa: E402
-from lc_indices import fit_alpha, mean_gamma, _sel  # noqa: E402
+from lc_indices import fit_alpha, mean_gamma, _sel, POST_HUMP_I  # noqa: E402
 
 ROOT = Path(__file__).parent
 _spec = importlib.util.spec_from_file_location("plot_mwl_lc", ROOT / "plot_mwl_lc.py")
@@ -32,7 +32,7 @@ OPT_POST = (5000, 25000)
 STYLE = {  # same colours/markers as the light-curve figure
     "X-ray": ("black", "o"), "i-band": ("#e34948", "o"), "Leavitt_Rc": ("#eda100", "s"), "Leavitt_Ic": ("#1baf7a", "D"),
 }
-LABEL = {"i-band": "NUTTelA-TAO $i$", "Leavitt_Rc": "Leavitt $R_c$", "Leavitt_Ic": "Leavitt $I_c$"}
+LABEL = {"i-band": "NUTTelA-TAO $i$ (post-hump 6.7–10.8 ks)", "Leavitt_Rc": "Leavitt $R_c$", "Leavitt_Ic": "Leavitt $I_c$"}
 
 
 def measurements(av_override=None):
@@ -47,11 +47,14 @@ def measurements(av_override=None):
     sdt = pm.sdt_points()
     av, src = (av_override, "override") if av_override is not None else pm.host_av()
     _, g7, g7e = pm.optical_photon_index(sdt, a_v=av)
-    for key in ("i-band", "Leavitt_Rc", "Leavitt_Ic"):
+    def infl(r): return r["err"] * max(1.0, np.sqrt(r["chi2"] / r["dof"]))
+    d = ds["i-band"]; mm = _sel(d["time"], POST_HUMP_I)
+    r = fit_alpha(d["time"][mm], d["flux_mJy"][mm], d["flux_err"][mm])
+    pts["i-band"] = dict(beta=g7 - 1, beta_err=g7e, alpha=r["alpha"], alpha_err=infl(r))
+    for key in ("Leavitt_Rc", "Leavitt_Ic"):
         d = ds[key]; mm = _sel(d["time"], OPT_POST)
         r = fit_alpha(d["time"][mm], d["flux_mJy"][mm], d["flux_err"][mm])
-        err = r["err"] * max(1.0, np.sqrt(r["chi2"] / r["dof"]))
-        pts[key] = dict(beta=g7 - 1, beta_err=g7e, alpha=r["alpha"], alpha_err=err)
+        pts[key] = dict(beta=g7 - 1, beta_err=g7e, alpha=r["alpha"], alpha_err=infl(r))
     return pts, av, src
 
 
@@ -61,7 +64,7 @@ def main(av_override=None):
     ax = None   # cr_plot(ax=None) creates the figure and draws the relation lines; reuse it afterwards
     for key, v in pts.items():
         color, mk = STYLE[key]
-        lab = "Swift/XRT (flare excl.)" if key == "X-ray" else f"{LABEL[key]} (post-hump)"
+        lab = "Swift/XRT (flare excl.)" if key == "X-ray" else LABEL[key]
         cr_plot(**v, ax=ax, marker=mk, color=color, ms=9 if key == "X-ray" else 8,
                 mec="black", mew=0.5, capsize=3, elinewidth=1.2, zorder=10, label=lab,
                 show_cr_legend=ax is None, plot_equal_p=True)
@@ -77,7 +80,7 @@ def main(av_override=None):
     if ax.get_legend() is not None:
         ax.get_legend().remove()
     h, l = ax.get_legend_handles_labels()
-    is_data = [("Swift" in t or "post-hump" in t) for t in l]
+    is_data = [("Swift" in t or "NUTTelA" in t or "Leavitt" in t) for t in l]
     ax.legend([hh for hh, d in zip(h, is_data) if d], [ll for ll, d in zip(l, is_data) if d],
               loc="upper left", frameon=True, framealpha=0.9,
               title=rf"optical $\beta$: 7DT, host $A_V$={av:.2f} (SMC)", title_fontsize=10)

@@ -18,7 +18,7 @@ import numpy as np
 
 from grb.modeling import load_all_optical_data
 from grb.spectral_index import load_xrt_spectral_index
-from lc_indices import fit_alpha, mean_gamma, _sel
+from lc_indices import fit_alpha, mean_gamma, _sel, POST_HUMP_I
 
 ROOT = Path(__file__).parent
 _spec = importlib.util.spec_from_file_location("plot_mwl_lc", ROOT / "plot_mwl_lc.py")
@@ -74,14 +74,18 @@ def main(av_override=None):
     lines.append(f"\n7DT beta_opt: observed {g_obs-1:.2f}; host-corrected (SMC, A_V = {av:.2f}, {src}) {bo:.2f} ± {boe:.2f}")
 
     # Optical alpha (post-hump)
-    for key, lab in (("i-band", "NUTTelA-TAO i 5–11 ks"), ("Leavitt_Rc", "Leavitt Rc"), ("Leavitt_Ic", "Leavitt Ic")):
+    d = ds["i-band"]
+    mm = _sel(d["time"], POST_HUMP_I)
+    r = fit_alpha(d["time"][mm], d["flux_mJy"][mm], d["flux_err"][mm])
+    test("Optical NUTTelA-TAO i, post-hump 6.7–10.8 ks", r["alpha"], r["err"] * max(1.0, np.sqrt(r["chi2"] / r["dof"])), bo, boe, lines)
+    ri = r
+    for key, lab in (("Leavitt_Rc", "Leavitt Rc"), ("Leavitt_Ic", "Leavitt Ic")):
         d = ds[key]; mm = _sel(d["time"], OPT_POST)
         r = fit_alpha(d["time"][mm], d["flux_mJy"][mm], d["flux_err"][mm])
         err = r["err"] * max(1.0, np.sqrt(r["chi2"] / r["dof"]))   # inflate by sqrt(chi2/dof)
         test(f"Optical {lab} (alpha err × sqrt(chi2/dof))", r["alpha"], err, bo, boe, lines)
 
     # Cross-band differences
-    ri = fit_alpha(*[ds["i-band"][k][_sel(ds["i-band"]["time"], OPT_POST)] for k in ("time", "flux_mJy", "flux_err")])
     ric = fit_alpha(ds["Leavitt_Ic"]["time"], ds["Leavitt_Ic"]["flux_mJy"], ds["Leavitt_Ic"]["flux_err"])
     lines.append("\n--- Cross-band (X minus optical) ---")
     lines.append(f"beta_X - beta_opt  = {bx - bo:+.2f} ± {np.hypot(bxe, boe):.2f}   "
