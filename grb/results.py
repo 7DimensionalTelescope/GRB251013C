@@ -88,13 +88,21 @@ def save_run_arrays(outdir, samples, log_probs, labels, top_k=10):
 
 
 def save_bestfit_params(outdir, labels, param_defs, top_params, top_log_probs,
-                        xrt_data, optical_datasets):
+                        xrt_data, optical_datasets, model_description=None):
     """Write the human-readable bestfit_params.txt summary."""
     outdir = Path(outdir)
+    if model_description is None:
+        parts = ["Core+RS"]
+        if any("t_start_flare" in l for l in labels):
+            parts.append("Norris flare")
+        if any("E_iso_wing" in l for l in labels):
+            parts.append("second component (wing jet)")
+        model_description = " + ".join(parts) + (" | wind medium" if any("A_star" in l for l in labels) else "")
+    n_ul = len(xrt_data.get('ul_time', []))
     lines = [
         "=== Fit Configuration ===",
-        f"Model: Core+RS + Norris flare + Wing jet",
-        f"XRT data: {len(xrt_data['time'])} points",
+        f"Model: {model_description}",
+        f"XRT data: {len(xrt_data['time'])} points" + (f" + {n_ul} upper limit(s)" if n_ul else ""),
     ]
     for dataset in optical_datasets:
         lines.append(f"{dataset['name']}: {len(dataset['time'])} points")

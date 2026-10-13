@@ -158,6 +158,16 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
     }
 
 
+def _data_options(outdir):
+    """Data-loading options recorded by the fit driver (fit_config.json), if any."""
+    cfg = Path(outdir) / "fit_config.json"
+    if not cfg.exists():
+        return {}
+    import json
+    data = json.loads(cfg.read_text())
+    return {k: data[k] for k in ("xray_extra", "late_optical") if k in data}
+
+
 def _sample_to_params(labels, theta):
     """Convert a sampled vector to a physical-parameter dict using the labels."""
     params = {}
@@ -200,8 +210,8 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
     # Load best-fit parameters
     params, include_flare, include_wing = load_best_fit_params(outdir)
 
-    # Load data
-    xrt_data, optical_datasets = load_all_optical_data()
+    # Load data (with the same options the fit used, if it recorded them)
+    xrt_data, optical_datasets = load_all_optical_data(**_data_options(outdir))
 
     # Separate optical LC data from 7DT spectrum data
     lc_data = [d for d in optical_datasets if not d['name'].startswith('7DT_')]
@@ -251,6 +261,9 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
     xrt_times_hr = xrt_data['time'] / 3600
     ax_xrt.errorbar(xrt_times_hr, xrt_data['flux'], yerr=xrt_data['flux_error'],
                    fmt='.', color='black', alpha=0.7, markersize=6, label='XRT data')
+    if len(xrt_data.get('ul_time', [])):
+        ax_xrt.plot(np.asarray(xrt_data['ul_time']) / 3600, xrt_data['ul_flux'], ls='', marker='v',
+                    mfc='none', mec='black', markersize=7, label=r'3$\sigma$ UL')
 
     # Plot components
     t_grid_hr = t_grid / 3600

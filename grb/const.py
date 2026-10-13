@@ -18,6 +18,13 @@ I_DATA_FILENAME = os.path.join(DATA_DIR, "i_data.csv")
 XRT_DATA_FILENAME = os.path.join(DATA_DIR, "xrt.csv")
 XRT_INDEX_DATA_FILENAME = os.path.join(DATA_DIR, "xrt_index.csv")
 SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
+XRAY_EXTRA_FILENAME = os.path.join(DATA_DIR, "xray_extra.csv")      # EP-FXT, Chandra, XRT upper limit
+LATE_OPTICAL_FILENAME = os.path.join(DATA_DIR, "late_optical.csv")  # GCN optical 3e4-2.5e5 s
+
+# XRT bins that UKSSDC flags as unreliable (no centroid); see data/ukssdc/README.md.
+XRT_UNRELIABLE_TIMES = (136157.868,)
+# Late optical points after this are inside the ~2.2e5 s rebrightening and are not fitted.
+LATE_OPTICAL_TMAX = 2.0e5
 
 RA = float(os.getenv("ra"))
 DEC = float(os.getenv("dec"))

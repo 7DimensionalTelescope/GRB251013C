@@ -10,6 +10,7 @@ Replaces the former standalone modeling/final_model.py.
 from datetime import datetime
 from pathlib import Path
 import argparse
+import json
 import multiprocessing as mp
 import os
 from multiprocessing import Pool
@@ -65,6 +66,13 @@ INITIAL_GUESS = {
     "eps_e_wing": 0.303,
     "eps_B_wing": 0.0121,
     "xi_wing": 0.98,  # optimum is at the physical limit 1.0; start just inside
+    "A_star": 0.1,    # wind medium (--medium wind)
+}
+# Second slow component (--second-component): start where a Gamma0~30 shell
+# decelerates at a few ks and leave the rest of its box to the walkers.
+SECOND_COMPONENT_GUESS = {
+    "E_iso_wing": 5e51, "Gamma0_wing": 30, "theta_c_wing": 0.1, "p_wing": 2.4,
+    "eps_e_wing": 0.1, "eps_B_wing": 0.01, "xi_wing": 0.9, "n_ism": 10.0,
 }
 # Cross-cal scales (7DT reference); only used when --include-cal
 for _name in NON_7DT_CAL_DATASETS:
@@ -82,6 +90,17 @@ def parse_args(argv=None):
                         help="Half-width of each cal scale about 1 (default 0.1 => [0.9, 1.1])")
     parser.add_argument("--use-spectral-index", default=True, action=argparse.BooleanOptionalAction,
                         help="Constrain the fit with the XRT spectral index (default: on)")
+    parser.add_argument("--second-component", default=False, action=argparse.BooleanOptionalAction,
+                        help="Slow second component (opened wing-jet bounds) instead of the Norris flare")
+    parser.add_argument("--medium", choices=("ism", "wind"), default="ism")
+    parser.add_argument("--xray-extra", default=False, action=argparse.BooleanOptionalAction,
+                        help="Add EP-FXT, Chandra and the XRT 3-sigma upper limit (data/xray_extra.csv)")
+    parser.add_argument("--late-optical", default=False, action=argparse.BooleanOptionalAction,
+                        help="Add the late GCN optical points (data/late_optical.csv, t <= LATE_OPTICAL_TMAX)")
+    parser.add_argument("--preoptimize", type=int, default=0, metavar="N",
+                        help="Before MCMC, evaluate N Latin-hypercube draws over the bounds and polish the "
+                             "best 3 with Powell; the best becomes the walker centre (for new models "
+                             "whose INITIAL_GUESS is rough)")
     parser.add_argument("--nsteps", type=int, default=3000)
     parser.add_argument("--nwalkers", type=int, default=None)
     parser.add_argument("--ncpus", type=int, default=64)
@@ -89,9 +108,46 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def initial_positions(param_defs, nwalkers):
+def _bounds_sampled(param_defs):
+    lo = np.array([np.log10(p.lower) if p.scale is Scale.LOG else p.lower for p in param_defs])
+    hi = np.array([np.log10(p.upper) if p.scale is Scale.LOG else p.upper for p in param_defs])
+    return lo, hi
+
+
+def preoptimize(param_defs, lp_args, pool, n_draws, seed=1):
+    """LHS search over the box + Powell polish of the best 3; returns the best sampled vector."""
+    from scipy.optimize import minimize
+    from scipy.stats import qmc
+    lo, hi = _bounds_sampled(param_defs)
+    draws = qmc.scale(qmc.LatinHypercube(d=len(lo), seed=seed).random(n_draws), lo, hi)
+    guess = np.array([np.log10(INITIAL_GUESS[p.name]) if p.scale is Scale.LOG else INITIAL_GUESS[p.name]
+                      for p in param_defs])
+    draws = np.vstack([np.clip(guess, lo, hi), draws])
+    lps = np.array(pool.starmap(log_probability, [(d,) + lp_args for d in draws]))
+    order = np.argsort(-lps)
+    print(f"  LHS: best logP {lps[order[0]]:.1f} (guess scored {lps[0]:.1f}); polishing top 3 with Powell...")
+    starts = [draws[i] for i in order[:3]]
+    polished = pool.starmap(_powell, [(x0, lp_args, lo, hi, param_defs) for x0 in starts])
+    best = max(polished, key=lambda r: r[1])
+    print(f"  Powell: logP {[round(r[1], 1) for r in polished]} -> using {best[1]:.1f}")
+    return best[0]
+
+
+def _powell(x0, lp_args, lo, hi, param_defs):
+    from scipy.optimize import minimize
+    f = lambda x: -log_probability(np.clip(x, lo, hi), param_defs, *lp_args[1:])
+    r = minimize(f, x0, method="Powell", bounds=list(zip(lo, hi)), options={"maxfev": 2000, "xtol": 1e-3, "ftol": 1e-3})
+    x = np.clip(r.x, lo, hi)
+    return x, -f(x)
+
+
+def initial_positions(param_defs, nwalkers, center=None):
     """Draw walker start positions around INITIAL_GUESS, clipped to bounds."""
     pos0 = []
+    if center is not None:   # sampled-space vector from preoptimize(): scatter 0.05 around it
+        lo, hi = _bounds_sampled(param_defs)
+        pos0 = np.random.normal(center, 0.05, size=(nwalkers, len(center)))
+        return np.clip(pos0, lo, hi)
     for p in param_defs:
         if p.name in INITIAL_GUESS:
             center = INITIAL_GUESS[p.name]
@@ -128,10 +184,14 @@ def initial_positions(param_defs, nwalkers):
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.second_component:
+        args.include_wing = True
+        INITIAL_GUESS.update(SECOND_COMPONENT_GUESS)
 
     # Load ALL data
     print("Loading ALL data (XRT + all optical bands)...")
-    xrt_data, optical_datasets = load_all_optical_data()
+    xrt_data, optical_datasets = load_all_optical_data(xray_extra=args.xray_extra,
+                                                       late_optical=args.late_optical)
 
     # XRT spectral index (photon index) constraint
     xrt_index_data = None
@@ -164,10 +224,14 @@ def main(argv=None):
     # Setup parameters
     param_defs = make_param_defs(
         include_flare=args.include_flare,
-        include_wing=False,#$args.include_wing,
+        include_wing=args.include_wing,
         include_cal=args.include_cal,
         cal_uncert=args.cal_uncert,
+        second_component=args.second_component,
+        medium=args.medium,
     )
+    print(f"Second component: {args.second_component} | medium: {args.medium} | "
+          f"xray_extra: {args.xray_extra} ({len(xrt_data['ul_time'])} UL) | late_optical: {args.late_optical}")
     labels = [f"log10_{p.name}" if p.scale is Scale.LOG else p.name for p in param_defs]
     ndim = len(labels)
 
@@ -184,13 +248,18 @@ def main(argv=None):
     print(f"Walkers: {nwalkers}")
     print(f"Steps: {args.nsteps}")
 
-    pos0 = initial_positions(param_defs, nwalkers)
+    lp_args = (param_defs, xrt_data, optical_datasets, args.include_flare, args.include_wing, xrt_index_data)
 
     # Run MCMC with multiprocessing
     print("\nRunning MCMC...")
     print(f"Using {n_workers} CPU cores (out of {n_cpus} available)")
 
     with Pool(n_workers) as pool:
+        center = None
+        if args.preoptimize:
+            print(f"Pre-optimizing from {args.preoptimize} LHS draws...")
+            center = preoptimize(param_defs, lp_args, pool, args.preoptimize)
+        pos0 = initial_positions(param_defs, nwalkers, center)
         sampler = emcee.EnsembleSampler(
             nwalkers, ndim,
             log_probability,
@@ -205,12 +274,17 @@ def main(argv=None):
     phase_name = "final"
     if args.include_flare:
         phase_name += "_flare"
-    if args.include_wing:
+    if args.second_component:
+        phase_name += "_second"
+    elif args.include_wing:
         phase_name += "_wing"
+    if args.medium == "wind":
+        phase_name += "_wind"
     if args.include_cal:
         phase_name += "_cal"
     outdir = Path(args.outdir) if args.outdir else FIT_RESULTS_DIR / f"{phase_name}_{run_ts}"
     outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / "fit_config.json").write_text(json.dumps(vars(args), indent=2, default=str))
 
     samples = sampler.get_chain(flat=True)
     log_probs = sampler.get_log_prob(flat=True)

@@ -98,21 +98,23 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
     else:
         wing_model = None
 
-    # XRT flux (xrt_data is now a dict with 'time', 'flux', 'flux_error')
-    xrt_times = xrt_data['time']
-    xrt_core = core_model.flux(xrt_times, XRT_BAND[0], XRT_BAND[1], 10)
-    xrt_flux = model_array(xrt_core.total).copy()  # Make writable copy
+    # XRT band flux of core (+ wing + flare) at an ascending time array
+    def xray_total(times):
+        flux = model_array(core_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total).copy()
+        if wing_model:
+            flux += model_array(wing_model.flux(times, XRT_BAND[0], XRT_BAND[1], 10).total)
+        if include_flare and "t_start_flare" in params:
+            flux += norris_flare(times, params["t_start_flare"], params["tau_rise_flare"],
+                                 params["tau_decay_flare"], params["A_flare"])
+        return flux
 
-    if wing_model:
-        xrt_wing = wing_model.flux(xrt_times, XRT_BAND[0], XRT_BAND[1], 10)
-        xrt_flux += model_array(xrt_wing.total)
-
-    # Flare in XRT
-    if include_flare and "t_start_flare" in params:
-        flare_temporal = norris_flare(xrt_times, params["t_start_flare"],
-                                     params["tau_rise_flare"], params["tau_decay_flare"],
-                                     params["A_flare"])
-        xrt_flux += flare_temporal
+    # XRT flux (xrt_data is now a dict with 'time', 'flux', 'flux_error'). Upper-limit
+    # epochs (xrt_data['ul_time'], optional) are evaluated separately and appended, so
+    # the returned xrt_flux has len(time) + len(ul_time) entries; the caller splits them.
+    xrt_flux = xray_total(xrt_data['time'])
+    ul_times = np.asarray(xrt_data.get('ul_time', []), dtype=float)
+    if len(ul_times):
+        xrt_flux = np.append(xrt_flux, xray_total(np.sort(ul_times)))
 
     # Optical fluxes (all bands)
     optical_fluxes = []
@@ -186,8 +188,15 @@ def log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare,
         # XRT chi-squared (xrt_data is now a dict with arrays)
         xrt_flux = xrt_data['flux']
         xrt_err = xrt_data['flux_error']
-        xrt_residuals = xrt_flux - xrt_model
+        n_det = len(xrt_flux)
+        xrt_residuals = xrt_flux - xrt_model[:n_det]
         chi2 += np.sum((xrt_residuals / xrt_err) ** 2)
+
+        # 3-sigma upper limits: one-sided penalty when the model exceeds the limit
+        ul_flux = np.asarray(xrt_data.get('ul_flux', []), dtype=float)
+        if len(ul_flux):
+            excess = np.maximum(0.0, xrt_model[n_det:] - ul_flux)
+            chi2 += np.sum((excess / (ul_flux / 3.0)) ** 2)
 
         # Optical chi-squared (all bands)
         for dataset, model_flux in zip(optical_datasets, optical_models):
