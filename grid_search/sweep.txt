@@ -1,0 +1,69 @@
+early_afterglow = {
+    # --- Core jet ---
+    "E_iso_core": 1.84780419338629e+54,
+    "Gamma0_core": 42.92684217858337,
+    "theta_c_core": 0.017539632661367616,
+
+    # --- Wind environment (environment="wind") ---
+    "A_star": 4.421694087558172,
+
+    # --- Forward shock (xi_e free in the fit -- must be given) ---
+    "p": 2.015535683988102,
+    "eps_e": 0.0031278031404307735,
+    "eps_B": 0.02147101842306743,
+    "xi_e": 0.7543527915800833,
+
+    # --- Early-afterglow jet/ejecta duration [s] (TophatJet duration; NOT a flare time) ---
+    "tau": 416.35727735379555,
+
+    # --- Reverse shock (xi_e_r free in the fit -- must be given) ---
+    "p_r": 2.0099091528179067,
+    "eps_e_r": 0.15723567719656473,
+    "eps_B_r": 0.1971638818411699,
+    "xi_e_r": 0.05393560834632512,
+
+    # --- Host extinction ---
+    "A_V": 0.36217938684309203,
+}
+
+# --- Flare (Norris, matches include_flare=True, flare_shape="norris"; earlier fit, unchanged) ---
+flare = {
+    "t_start_flare": 2149.89,
+    "tau_rise_flare": 150.66236,
+    "tau_decay_flare": 5288.29,
+    "A_flare": 9.89646e-10,
+    "flare_beta": 0.751384,
+    # "t_start_flare": 2149.89,
+    # "tau_rise_flare": 1.66236,
+    # "tau_decay_flare": 5288.29,
+    # "A_flare": 4.89646e-10,
+    # "flare_beta": 0.721384,
+    # --- Flare (flare_shape="sbpl"; not used in this fit -- these are just the fit_final_model.py INITIAL_GUESS seed) ---
+    # "t_break_flare": 2300,
+    # "alpha_rise_flare": -3,
+    # "alpha_decay_flare": 2,
+    # "smooth_flare": 1,
+    # "A_flare": 9.92559e-10,
+    # "flare_beta": 0.820278,
+
+    # --- Flare (flare_shape="gaussian"; not used in this fit -- these are just the fit_final_model.py INITIAL_GUESS seed) ---
+    # "t_peak_flare": 3468,
+    # "sigma_flare": 900,
+    # "A_flare": 9.92559e-10,
+    # "flare_beta": 0.820278,
+}
+
+# F_total(t) = F_FS+RS(t) + F_flare(t)
+overrides = {
+    **early_afterglow,
+    **flare,
+
+    # --- Wing jet (uncomment all 6 for include_wing=True; this best fit didn't
+    # include a wing, so these are still the INITIAL_GUESS placeholder values) ---
+    # "E_iso_wing": 1.011e+52,
+    # "Gamma0_wing": 19.2,
+    # "theta_c_wing": 0.492,
+    # "p_wing": 3.06,
+    # "eps_e_wing": 0.303,
+    # "eps_B_wing": 0.0121,
+}
