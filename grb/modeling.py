@@ -138,7 +138,8 @@ def make_core_model(params):
         eps_e=params["eps_e"],
         eps_B=params["eps_B"],
         p=params["p"],
-        xi_e=params.get("xi", 1.0),
+        # xi_e / xi_e_r: the early_phase_model (final MCMC) names; xi / xi_r: the older grb names
+        xi_e=params.get("xi_e", params.get("xi", 1.0)),
         ssc=False,
         kn=False,
     )
@@ -150,7 +151,7 @@ def make_core_model(params):
             eps_e=params["eps_e_r"],
             eps_B=params["eps_B_r"],
             p=params["p_r"],
-            xi_e=params.get("xi_r", params.get("xi", 1.0)),
+            xi_e=params.get("xi_e_r", params.get("xi_r", params.get("xi", 1.0))),
             ssc=False,
             kn=False,
         )
