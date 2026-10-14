@@ -170,9 +170,9 @@ def compute_model_flux_all_bands(params, xrt_data, optical_datasets, include_fla
 
 
 def log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                   xrt_index_data=None):
-    """Log likelihood for all data"""
-    params = {}
+                   xrt_index_data=None, fixed_params=None):
+    """Log likelihood for all data. fixed_params: {name: physical value} held constant."""
+    params = dict(fixed_params) if fixed_params else {}
     for param_def, value in zip(param_defs, theta):
         if param_def.scale is Scale.LOG:
             params[param_def.name] = 10 ** value
@@ -236,11 +236,11 @@ def log_prior(theta, param_defs):
 
 
 def log_probability(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                    xrt_index_data=None):
+                    xrt_index_data=None, fixed_params=None):
     """Combined log probability"""
     lp = log_prior(theta, param_defs)
     if not np.isfinite(lp):
         return -np.inf
     ll = log_likelihood(theta, param_defs, xrt_data, optical_datasets, include_flare, include_wing,
-                        xrt_index_data)
+                        xrt_index_data, fixed_params)
     return lp + ll

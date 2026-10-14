@@ -72,7 +72,7 @@ INITIAL_GUESS = {
 # decelerates at a few ks and leave the rest of its box to the walkers.
 SECOND_COMPONENT_GUESS = {
     "E_iso_wing": 5e51, "Gamma0_wing": 30, "theta_c_wing": 0.1, "p_wing": 2.4,
-    "eps_e_wing": 0.1, "eps_B_wing": 0.01, "xi_wing": 0.9, "n_ism": 10.0,
+    "eps_e_wing": 0.1, "eps_B_wing": 0.01, "xi_wing": 0.9, "n_ism": 10.0, "tau_wing": 300.0,
 }
 # Cross-cal scales (7DT reference); only used when --include-cal
 for _name in NON_7DT_CAL_DATASETS:
@@ -99,6 +99,13 @@ def parse_args(argv=None):
                         help="Add EP-FXT, Chandra and the XRT 3-sigma upper limit (data/xray_extra.csv)")
     parser.add_argument("--late-optical", default=False, action=argparse.BooleanOptionalAction,
                         help="Add the late GCN optical points (data/late_optical.csv, t <= LATE_OPTICAL_TMAX)")
+    parser.add_argument("--fix", default="", metavar="NAME=VALUE,...",
+                        help="Hold parameters fixed at physical values (removed from the sampled vector), "
+                             "e.g. --fix E_iso_core=7.6e52,p=2.14")
+    parser.add_argument("--fix-from", default=None, metavar="RUN_DIR",
+                        help="Fix every core/flare parameter at the best fit of a previous run (stage-2 fit)")
+    parser.add_argument("--xray-only", default=False, action=argparse.BooleanOptionalAction,
+                        help="Fit XRT (+extra X-ray, spectral index) only; optical datasets dropped (stage-1 fit)")
     parser.add_argument("--preoptimize", type=int, default=0, metavar="N",
                         help="Before MCMC, evaluate N Latin-hypercube draws over the bounds and polish the "
                              "best 3 with Powell; the best becomes the walker centre (for new models "
@@ -194,6 +201,22 @@ def main(argv=None):
     print("Loading ALL data (XRT + all optical bands)...")
     xrt_data, optical_datasets = load_all_optical_data(xray_extra=args.xray_extra,
                                                        late_optical=args.late_optical)
+    if args.xray_only:
+        optical_datasets = []
+        print("  --xray-only: optical datasets dropped from the likelihood")
+
+    # Fixed parameters (physical values)
+    fixed_params = {}
+    if args.fix_from:
+        from grb.results import load_best_fit_params
+        prev, _, _ = load_best_fit_params(args.fix_from)
+        core_names = ("E_iso_core", "Gamma0_core", "theta_c_core", "n_ism", "A_star", "p", "eps_e", "eps_B",
+                      "xi", "tau", "t_start_flare", "tau_rise_flare", "tau_decay_flare", "A_flare", "flare_beta")
+        fixed_params.update({k: float(v) for k, v in prev.items() if k in core_names})
+    for item in filter(None, args.fix.split(",")):
+        k, v = item.split("="); fixed_params[k.strip()] = float(v)
+    if fixed_params:
+        print("  fixed:", ", ".join(f"{k}={v:.4g}" for k, v in fixed_params.items()))
 
     # XRT spectral index (photon index) constraint
     xrt_index_data = None
@@ -233,6 +256,7 @@ def main(argv=None):
         medium=args.medium,
         flare_xray_only=args.flare_xray_only,
     )
+    param_defs = [p for p in param_defs if p.name not in fixed_params]
     print(f"Second component: {args.second_component} | medium: {args.medium} | "
           f"xray_extra: {args.xray_extra} ({len(xrt_data['ul_time'])} UL) | late_optical: {args.late_optical}")
     labels = [f"log10_{p.name}" if p.scale is Scale.LOG else p.name for p in param_defs]
@@ -251,7 +275,8 @@ def main(argv=None):
     print(f"Walkers: {nwalkers}")
     print(f"Steps: {args.nsteps}")
 
-    lp_args = (param_defs, xrt_data, optical_datasets, args.include_flare, args.include_wing, xrt_index_data)
+    lp_args = (param_defs, xrt_data, optical_datasets, args.include_flare, args.include_wing, xrt_index_data,
+               fixed_params)
 
     # Run MCMC with multiprocessing
     print("\nRunning MCMC...")
@@ -266,8 +291,7 @@ def main(argv=None):
         sampler = emcee.EnsembleSampler(
             nwalkers, ndim,
             log_probability,
-            args=(param_defs, xrt_data, optical_datasets, args.include_flare, args.include_wing,
-                  xrt_index_data),
+            args=lp_args,
             pool=pool,
         )
         sampler.run_mcmc(pos0, args.nsteps, progress=True)
@@ -285,9 +309,14 @@ def main(argv=None):
         phase_name += "_wind"
     if args.include_cal:
         phase_name += "_cal"
+    if args.xray_only:
+        phase_name += "_xonly"
+    if fixed_params:
+        phase_name += "_stage2"
     outdir = Path(args.outdir) if args.outdir else FIT_RESULTS_DIR / f"{phase_name}_{run_ts}"
     outdir.mkdir(parents=True, exist_ok=True)
-    (outdir / "fit_config.json").write_text(json.dumps(vars(args), indent=2, default=str))
+    cfg = dict(vars(args)); cfg["fixed_params"] = fixed_params
+    (outdir / "fit_config.json").write_text(json.dumps(cfg, indent=2, default=str))
 
     samples = sampler.get_chain(flat=True)
     log_probs = sampler.get_log_prob(flat=True)
@@ -298,7 +327,7 @@ def main(argv=None):
     print(f"Results saved to: {outdir}")
 
     save_bestfit_params(outdir, labels, param_defs, top_params, top_log_probs,
-                        xrt_data, optical_datasets)
+                        xrt_data, optical_datasets, fixed_params=fixed_params)
 
     # Plot light curves with best-fit model
     print("\nPlotting best-fit light curves...")

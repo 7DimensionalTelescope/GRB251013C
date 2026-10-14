@@ -200,7 +200,7 @@ def make_wing_model(params):
         Gamma0=params["Gamma0_wing"],
         theta_c=params["theta_c_wing"],
         spreading=True,  # Enable spreading to maintain flux at late times
-        duration=params.get("tau", 10.0),
+        duration=params.get("tau_wing", params.get("tau", 10.0)),
     )
     radiation = Radiation(
         eps_e=params.get("eps_e_wing", params["eps_e"]),

@@ -119,6 +119,9 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
             ParamDefWithPrior("eps_e_wing", 0.01, 1.0, Scale.LOG),
             ParamDefWithPrior("eps_B_wing", 1e-4, 0.3, Scale.LOG),
             ParamDefWithPrior("xi_wing", 0.6, 1.0, Scale.LINEAR),
+            # engine-frame emission duration of the second shell: a long duration delays
+            # its deceleration to ~(1+z)*tau_wing and sharpens the optical hump
+            ParamDefWithPrior("tau_wing", 10, 3000, Scale.LOG),
         ])
     elif include_wing:
         params.extend([
