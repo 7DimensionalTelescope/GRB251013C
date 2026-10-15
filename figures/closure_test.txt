@@ -1,0 +1,62 @@
+Closure-relation test, GRB 251013C (F ∝ t^-alpha nu^-beta; tension = (alpha_obs - alpha_pred)/σ)
+
+--- X-ray 0.45 ks–4.7 d, flare excluded:  alpha = 1.04 ± 0.03,  beta = 0.89 ± 0.04 ---
+relation                               alpha_pred  p(beta)   tension
+ISM  slow  nu_m<nu<nu_c                1.33 ± 0.06     2.77     -4.4σ
+ISM  slow/fast  nu>nu_c                0.83 ± 0.06     1.77     +3.3σ
+ISM  fast  nu_c<nu<nu_m (b=1/2)        0.25 ± 0.00      nan    +23.4σ
+Wind slow  nu_m<nu<nu_c                1.83 ± 0.06     2.77    -12.1σ
+Wind slow/fast  nu>nu_c                0.83 ± 0.06     1.77     +3.3σ
+Wind fast  nu_c<nu<nu_m (b=1/2)       -0.25 ± 0.00      nan    +38.2σ
+Jet (spreading)  nu_m<nu<nu_c          2.77 ± 0.07     2.77    -21.3σ
+Jet (spreading)  nu>nu_c               1.77 ± 0.07     1.77     -9.0σ
+Jet ISM no-spread  nu_m<nu<nu_c        2.08 ± 0.06     2.77    -16.0σ
+Jet ISM no-spread  nu>nu_c             1.58 ± 0.06     1.77     -8.3σ
+
+7DT beta_opt: observed 1.33; host-corrected (SMC, A_V = 0.17, final_flare_20260803_101842) 1.05 ± 0.14
+
+--- Optical NUTTelA-TAO i, post-hump 6.7–10.8 ks:  alpha = 2.46 ± 0.16,  beta = 1.05 ± 0.14 ---
+relation                               alpha_pred  p(beta)   tension
+ISM  slow  nu_m<nu<nu_c                1.57 ± 0.21     3.10     +3.3σ
+ISM  slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +5.2σ
+ISM  fast  nu_c<nu<nu_m (b=1/2)        0.25 ± 0.00      nan    +13.8σ
+Wind slow  nu_m<nu<nu_c                2.07 ± 0.21     3.10     +1.4σ  <-- OK
+Wind slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +5.2σ
+Wind fast  nu_c<nu<nu_m (b=1/2)       -0.25 ± 0.00      nan    +17.0σ
+Jet (spreading)  nu_m<nu<nu_c          3.10 ± 0.28     3.10     -2.0σ  <-- OK
+Jet (spreading)  nu>nu_c               2.10 ± 0.28     2.10     +1.1σ  <-- OK
+Jet ISM no-spread  nu_m<nu<nu_c        2.32 ± 0.21     3.10     +0.5σ  <-- OK
+Jet ISM no-spread  nu>nu_c             1.82 ± 0.21     2.10     +2.4σ  ~
+
+--- Optical Leavitt Rc (alpha err × sqrt(chi2/dof)):  alpha = 1.23 ± 0.04,  beta = 1.05 ± 0.14 ---
+relation                               alpha_pred  p(beta)   tension
+ISM  slow  nu_m<nu<nu_c                1.57 ± 0.21     3.10     -1.6σ  <-- OK
+ISM  slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +0.7σ  <-- OK
+ISM  fast  nu_c<nu<nu_m (b=1/2)        0.25 ± 0.00      nan    +27.8σ
+Wind slow  nu_m<nu<nu_c                2.07 ± 0.21     3.10     -3.9σ
+Wind slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +0.7σ  <-- OK
+Wind fast  nu_c<nu<nu_m (b=1/2)       -0.25 ± 0.00      nan    +42.1σ
+Jet (spreading)  nu_m<nu<nu_c          3.10 ± 0.28     3.10     -6.5σ
+Jet (spreading)  nu>nu_c               2.10 ± 0.28     2.10     -3.0σ
+Jet ISM no-spread  nu_m<nu<nu_c        2.32 ± 0.21     3.10     -5.1σ
+Jet ISM no-spread  nu>nu_c             1.82 ± 0.21     2.10     -2.8σ  ~
+
+--- Optical Leavitt Ic (alpha err × sqrt(chi2/dof)):  alpha = 1.12 ± 0.12,  beta = 1.05 ± 0.14 ---
+relation                               alpha_pred  p(beta)   tension
+ISM  slow  nu_m<nu<nu_c                1.57 ± 0.21     3.10     -1.8σ  <-- OK
+ISM  slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +0.2σ  <-- OK
+ISM  fast  nu_c<nu<nu_m (b=1/2)        0.25 ± 0.00      nan     +7.0σ
+Wind slow  nu_m<nu<nu_c                2.07 ± 0.21     3.10     -3.9σ
+Wind slow/fast  nu>nu_c                1.07 ± 0.21     2.10     +0.2σ  <-- OK
+Wind fast  nu_c<nu<nu_m (b=1/2)       -0.25 ± 0.00      nan    +11.0σ
+Jet (spreading)  nu_m<nu<nu_c          3.10 ± 0.28     3.10     -6.4σ
+Jet (spreading)  nu>nu_c               2.10 ± 0.28     2.10     -3.2σ
+Jet ISM no-spread  nu_m<nu<nu_c        2.32 ± 0.21     3.10     -4.9σ
+Jet ISM no-spread  nu>nu_c             1.82 ± 0.21     2.10     -2.9σ  ~
+
+--- Cross-band (X minus optical) ---
+beta_X - beta_opt  = -0.16 ± 0.15   (same segment: 0 ; nu_c between: +0.5)
+alpha_X - alpha_i  = -1.42 ± 0.16   (same segment: 0 ; nu_c between, ISM: +0.25 ; wind: -0.25)
+alpha_X - alpha_Ic = -0.08 ± 0.08   (same segment: 0 ; nu_c between, ISM: +0.25 ; wind: -0.25)
+A_V (SMC) needed for beta_opt = beta_X        : 0.27
+A_V (SMC) needed for beta_opt = beta_X - 0.5  : 0.58

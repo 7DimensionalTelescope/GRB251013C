@@ -115,9 +115,9 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
             wing_output = wing_model.flux_density(times, nu_array)
             wing_flux = model_array(wing_output.total).copy()
 
-        # Flare (with spectral scaling)
+        # Flare (with spectral scaling); absent flare_beta => X-ray-only flare
         flare_flux = np.zeros_like(core_fs)
-        if include_flare and "t_start_flare" in params:
+        if include_flare and "t_start_flare" in params and "flare_beta" in params:
             nu_xrt_min = XRT_NU_LO
             nu_xrt_max = XRT_NU_HI
             beta_flare = params.get("flare_beta", 0.8)
@@ -156,6 +156,16 @@ def compute_model_components(params, times, frequency, xrt_band, include_flare, 
         'wing': wing_flux,
         'total': total,
     }
+
+
+def _data_options(outdir):
+    """Data-loading options recorded by the fit driver (fit_config.json), if any."""
+    cfg = Path(outdir) / "fit_config.json"
+    if not cfg.exists():
+        return {}
+    import json
+    data = json.loads(cfg.read_text())
+    return {k: data[k] for k in ("xray_extra", "late_optical") if k in data}
 
 
 def _sample_to_params(labels, theta):
@@ -200,8 +210,8 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
     # Load best-fit parameters
     params, include_flare, include_wing = load_best_fit_params(outdir)
 
-    # Load data
-    xrt_data, optical_datasets = load_all_optical_data()
+    # Load data (with the same options the fit used, if it recorded them)
+    xrt_data, optical_datasets = load_all_optical_data(**_data_options(outdir))
 
     # Separate optical LC data from 7DT spectrum data
     lc_data = [d for d in optical_datasets if not d['name'].startswith('7DT_')]
@@ -251,6 +261,9 @@ def plot_light_curves(outdir, band_draws=300, band_seed=42):
     xrt_times_hr = xrt_data['time'] / 3600
     ax_xrt.errorbar(xrt_times_hr, xrt_data['flux'], yerr=xrt_data['flux_error'],
                    fmt='.', color='black', alpha=0.7, markersize=6, label='XRT data')
+    if len(xrt_data.get('ul_time', [])):
+        ax_xrt.plot(np.asarray(xrt_data['ul_time']) / 3600, xrt_data['ul_flux'], ls='', marker='v',
+                    mfc='none', mec='black', markersize=7, label=r'3$\sigma$ UL')
 
     # Plot components
     t_grid_hr = t_grid / 3600
@@ -452,12 +465,15 @@ def plot_spectral_index_comparison(outdir):
 
     p = params['p']
 
-    # Break frequencies for core and wing separately (panel 2)
+    # Break frequencies for core and wing separately (panel 2); the analytic
+    # Granot & Sari expressions assume a constant-density medium, so for a wind
+    # run (A_star, no n_ism) the curves are skipped.
+    has_ism = 'n_ism' in params
     core_breaks = compute_break_frequencies(
         {"E_iso": params['E_iso_core'], "n_ism": params['n_ism'],
          "eps_e": params['eps_e'], "eps_B": params['eps_B'], "p": params['p']},
         REDSHIFT, t_grid
-    )
+    ) if has_ism else None
     E_xrt_min = 0.3  # keV
     E_xrt_max = 10.0  # keV
 
@@ -481,7 +497,7 @@ def plot_spectral_index_comparison(outdir):
              "eps_B": params.get('eps_B_wing', params['eps_B']),
              "p": params.get('p_wing', params['p'])},
             REDSHIFT, t_grid
-        )
+        ) if has_ism else None
 
     # keep mask = the fit's actual flux-contribution selection (uses summed core+wing)
     _, keep = spectral_index_model(core_model, wing_model, params,
@@ -512,11 +528,14 @@ def plot_spectral_index_comparison(outdir):
     ax1.set_title(f'XRT Spectral Index Evolution (p = {p:.3f})', fontsize=12, fontweight='bold')
 
     # Panel 2: Break frequencies (core solid, wing dashed)
-    ax2.loglog(t_grid_hr, core_breaks["nu_m"], 'r-', lw=2, label=r'Core $\nu_m$')
-    ax2.loglog(t_grid_hr, core_breaks["nu_c"], color='darkorange', lw=2, label=r'Core $\nu_c$')
-    if wing_model is not None:
+    if core_breaks is not None:
+        ax2.loglog(t_grid_hr, core_breaks["nu_m"], 'r-', lw=2, label=r'Core $\nu_m$')
+        ax2.loglog(t_grid_hr, core_breaks["nu_c"], color='darkorange', lw=2, label=r'Core $\nu_c$')
+    if wing_model is not None and wing_breaks is not None:
         ax2.loglog(t_grid_hr, wing_breaks["nu_m"], 'b--', lw=2, label=r'Wing $\nu_m$')
         ax2.loglog(t_grid_hr, wing_breaks["nu_c"], color='green', ls='--', lw=2, label=r'Wing $\nu_c$')
+    else:
+        ax2.text(0.5, 0.5, "analytic break frequencies: ISM only", transform=ax2.transAxes, ha="center", color="gray")
 
     # XRT band
     nu_xrt_min = E_xrt_min * 2.418e17  # keV to Hz

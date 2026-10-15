@@ -18,6 +18,13 @@ I_DATA_FILENAME = os.path.join(DATA_DIR, "i_data.csv")
 XRT_DATA_FILENAME = os.path.join(DATA_DIR, "xrt.csv")
 XRT_INDEX_DATA_FILENAME = os.path.join(DATA_DIR, "xrt_index.csv")
 SDT_DATA_FILENAME = os.path.join(DATA_DIR, "sdt.csv")
+XRAY_EXTRA_FILENAME = os.path.join(DATA_DIR, "xray_extra.csv")      # EP-FXT, Chandra, XRT upper limit
+LATE_OPTICAL_FILENAME = os.path.join(DATA_DIR, "late_optical.csv")  # GCN optical 3e4-2.5e5 s
+
+# XRT bins that UKSSDC flags as unreliable (no centroid); see data/ukssdc/README.md.
+XRT_UNRELIABLE_TIMES = (136157.868,)
+# Late optical points after this are inside the ~2.2e5 s rebrightening and are not fitted.
+LATE_OPTICAL_TMAX = 2.0e5
 
 RA = float(os.getenv("ra"))
 DEC = float(os.getenv("dec"))
@@ -47,6 +54,11 @@ SI_FLARE_FRAC_MAX = 0.5
 XRT_EXCLUDE_TIME_RANGE = (3e3, 1e4)
 XRT_FLARE_START_TIME = 3e3
 XRT_FLARE_END_TIME = 1e4
+
+# Photometric calibration floor applied to every magnitude error before the
+# mag -> flux conversion (small-telescope GCN errors of 0.01-0.02 mag are
+# statistical only; see analysis/2026-08_core_flare_team/reports/team_synthesis.md).
+MAG_ERROR_FLOOR = 0.05
 
 # Log10 Gaussian prior on host-galaxy A_V.
 HOST_AV_LOG10_MEAN = -0.82

@@ -1,0 +1,9 @@
+# Extra X-ray constraints not in data/xrt.csv. flux in erg/cm^2/s, 0.3-10 keV (observed).
+# kind=det: detection with 1-sigma error; kind=ul: 3-sigma upper limit (flux_err unused).
+# EP-FXT: GCN 42247, 0.5-10 keV 3.75e-10 +/- 7.89e-12 converted to 0.3-10 keV with Gamma=1.78 (x1.114).
+# Chandra: GCN 42642, ~2.5e-15 (0.3-10 keV, 40 ks starting T0+27.396 d); 30% error assumed (not published).
+# XRT UL: UKSSDC PCUL.qdp (data/ukssdc), 3-sigma.
+time,time_lo,time_hi,flux,flux_err,kind,source
+7179.0,6879.0,7479.0,4.177e-10,8.8e-12,det,EP-FXT GCN42247
+2367014.4,2347014.4,2387014.4,2.5e-15,7.5e-16,det,Chandra GCN42642
+836199.3,637358.7,1035040.0,6.09e-14,0,ul,Swift/XRT UKSSDC 3sigma

@@ -6,22 +6,43 @@ models, and loads every XRT and optical dataset the fit uses.
 import numpy as np
 import pandas as pd
 
-from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet
+from VegasAfterglow import ISM, Model, Observer, Radiation, TophatJet, Wind
 
-from .const import D_L, REDSHIFT, MODEL_RESOLUTIONS
+from .const import (D_L, REDSHIFT, MODEL_RESOLUTIONS, XRAY_EXTRA_FILENAME, LATE_OPTICAL_FILENAME,
+                    XRT_UNRELIABLE_TIMES, LATE_OPTICAL_TMAX, MAG_ERROR_FLOOR)
 from .io import read_data, filter_data
 from .utils import flux_error, mJy_to_erg_cm2_s_Hz, seconds_from_trigger, unit_conversion
 
 
-def load_all_optical_data():
-    """Load ALL optical and XRT data (following late_phase.py structure)"""
+def load_all_optical_data(xray_extra=False, late_optical=False):
+    """Load ALL optical and XRT data (following late_phase.py structure).
+
+    XRT bins listed in XRT_UNRELIABLE_TIMES are always dropped. xray_extra adds the
+    detections and the 3-sigma upper limit in data/xray_extra.csv (upper limits go to
+    xrt_dict['ul_time'] / ['ul_flux']); late_optical adds the GCN optical points in
+    data/late_optical.csv (t <= LATE_OPTICAL_TMAX) as one dataset per facility+filter.
+    """
     # XRT data
     xrt_data = read_data("xrt")
+    bad = np.isin(np.round(xrt_data['time'].to_numpy(float), 3), np.round(XRT_UNRELIABLE_TIMES, 3))
+    xrt_data = xrt_data[~bad]
     xrt_dict = {
         'time': xrt_data['time'].to_numpy(float),
         'flux': xrt_data['flux'].to_numpy(float),
         'flux_error': flux_error(xrt_data),
+        'ul_time': np.array([]),
+        'ul_flux': np.array([]),
     }
+    if xray_extra:
+        ex = pd.read_csv(XRAY_EXTRA_FILENAME, comment="#")
+        det = ex[ex['kind'] == 'det']
+        order = np.argsort(np.append(xrt_dict['time'], det['time'].to_numpy(float)))
+        xrt_dict['time'] = np.append(xrt_dict['time'], det['time'].to_numpy(float))[order]
+        xrt_dict['flux'] = np.append(xrt_dict['flux'], det['flux'].to_numpy(float))[order]
+        xrt_dict['flux_error'] = np.append(xrt_dict['flux_error'], det['flux_err'].to_numpy(float))[order]
+        ul = ex[ex['kind'] == 'ul']
+        xrt_dict['ul_time'] = ul['time'].to_numpy(float)
+        xrt_dict['ul_flux'] = ul['flux'].to_numpy(float)
     
     optical_datasets = []
     
@@ -60,8 +81,30 @@ def load_all_optical_data():
             'flux_mJy': np.array([float(row["flux_mJy"])]),
             'flux_err': np.array([float(row["flux_mJy_error"])]),
         })
+
+    # 4. Late GCN optical points (already galactic-extinction corrected, AB)
+    if late_optical:
+        lo = pd.read_csv(LATE_OPTICAL_FILENAME)
+        lo = lo[lo['time'] <= LATE_OPTICAL_TMAX]
+        floor = MAG_ERROR_FLOOR * 0.4 * np.log(10.0)
+        for (fac, filt), g in lo.groupby(['facility', 'filter'], sort=False):
+            flux = g['flux_mJy'].to_numpy(float)
+            optical_datasets.append({
+                'name': f'late_{fac}_{filt}',
+                'frequency': float(g['frequency_Hz'].iloc[0]),
+                'time': g['time'].to_numpy(float),
+                'flux_mJy': flux,
+                'flux_err': np.maximum(g['flux_err_mJy'].to_numpy(float), floor * flux),
+            })
     
     return xrt_dict, optical_datasets
+
+
+def make_medium(params):
+    """Wind medium when A_star is a fitted parameter, otherwise constant-density ISM."""
+    if "A_star" in params:
+        return Wind(A_star=params["A_star"])
+    return ISM(n_ism=params["n_ism"])
 
 
 def add_observation(df, fitter, input_type="flux_density", label=None, **kwargs):
@@ -114,7 +157,7 @@ def add_observation(df, fitter, input_type="flux_density", label=None, **kwargs)
 def make_core_model(params):
     """Core jet with reverse shock"""
     observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
+    medium = make_medium(params)
     jet = TophatJet(
         E_iso=params["E_iso_core"],
         Gamma0=params["Gamma0_core"],
@@ -149,15 +192,15 @@ def make_core_model(params):
 
 
 def make_wing_model(params):
-    """Wing jet (no reverse shock, with spreading for late-time emission)"""
+    """Wing jet / second slow component (no reverse shock, spreading on)"""
     observer = Observer(lumi_dist=D_L, z=REDSHIFT, theta_obs=0)
-    medium = ISM(n_ism=params["n_ism"])
+    medium = make_medium(params)
     jet = TophatJet(
         E_iso=params["E_iso_wing"],
         Gamma0=params["Gamma0_wing"],
         theta_c=params["theta_c_wing"],
         spreading=True,  # Enable spreading to maintain flux at late times
-        duration=params.get("tau", 10.0),
+        duration=params.get("tau_wing", params.get("tau", 10.0)),
     )
     radiation = Radiation(
         eps_e=params.get("eps_e_wing", params["eps_e"]),

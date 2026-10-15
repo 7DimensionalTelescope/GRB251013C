@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from .const import FILTER_INFO
+from .const import FILTER_INFO, MAG_ERROR_FLOOR
 from astropy import constants as const
 from astropy import units as u
 
@@ -10,14 +10,24 @@ def mag_to_flux_mJy(df):
 
     mag = df["magnitude"].to_numpy(float) if "magnitude" in df.columns else df["Mag"].to_numpy(float)
     mag_err = df["mag_error"].to_numpy(float) if "mag_error" in df.columns else df["Error"].to_numpy(float)
+    # Calibration floor; a missing error becomes the floor.
+    mag_err = np.where(np.isfinite(mag_err), np.maximum(mag_err, MAG_ERROR_FLOOR), MAG_ERROR_FLOOR)
+
+    # Per-band zero point: FILTER_INFO declares Rc/Ic/V/R/J as Vega-system
+    # photometry (e.g. GCN 42333 Leavitt: Lupton-2005 conversion => Vega).
+    # Using the AB ZP (3631 Jy) for them over-brightens Rc by 0.18 mag and
+    # Ic by 0.38 mag.
+    filters = df["filter"].tolist() if "filter" in df.columns else [None] * len(mag)
 
     if "wavelength" in df.columns:
         wavelengths = df["wavelength"].to_numpy(float)
         bandwidths = df["filter_width"].to_numpy(float)
         unit = "AA"
         flx_list, flx_err_list = [], []
-        for m, e in zip(mag, mag_err):
-            f, fe = _mag_to_flux_mJy(m, e)
+        for m, e, filt in zip(mag, mag_err, filters):
+            info = FILTER_INFO.get(filt) if filt is not None else None
+            zp = info["vega_zero_point_jy"] if info is not None and info.get("system") == "Vega" else 3631
+            f, fe = _mag_to_flux_mJy(m, e, zero_point=zp)
             flx_list.append(f)
             flx_err_list.append(fe)
     else:
@@ -40,6 +50,20 @@ def _mag_to_flux_mJy(mag, mag_err=None, zero_point=3631):
     else:
         flux_jy_err = None
     return flux_jy, flux_jy_err
+
+def heliocentric_correction_seconds(date_obs, ra=None, dec=None):
+    """HJD - JD (seconds) for the burst position at the given UTC time(s).
+
+    Positive means the heliocentric time stamp is later than the geocentric
+    one, i.e. an HJD mistakenly read as JD/UTC is late by this amount."""
+    from astropy.coordinates import EarthLocation, SkyCoord
+    from astropy.time import Time
+    if ra is None or dec is None:
+        from .const import RA, DEC
+        ra, dec = RA, DEC
+    t = Time(pd.to_datetime(date_obs).to_numpy(), scale="utc", location=EarthLocation.from_geodetic(0, 0, 0))
+    return t.light_travel_time(SkyCoord(ra, dec, unit="deg"), kind="heliocentric").to_value("s")
+
 
 def unit_conversion(value, input_unit, output_unit):
     return u.Quantity(value, input_unit).to(output_unit, equivalencies=u.spectral()).value

@@ -30,7 +30,8 @@ def dataset_cal_factor(params, dataset_name):
     return float(params.get(cal_param_name(dataset_name), 1.0))
 
 
-def make_param_defs(include_flare=True, include_wing=True, include_cal=False, cal_uncert=0.1):
+def make_param_defs(include_flare=True, include_wing=True, include_cal=False, cal_uncert=0.1,
+                    second_component=False, medium="ism", flare_xray_only=False):
     """Parameter definitions
 
     Bounds retuned (2026-07-30) from the joint re-optimization of the
@@ -49,7 +50,19 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
     include_cal: add one LINEAR multiplicative scale per non-7DT optical LC
     dataset (i-band, Leavitt_Rc, Leavitt_Ic), bounded to
     [1 - cal_uncert, 1 + cal_uncert]. 7DT is the flux reference (scale=1).
+
+    second_component (2026-10-13): the "wing" jet is reinterpreted as a slow second
+    component that makes the ~2 ks optical hump / 5-7 ks X-ray excess, so its
+    bounds are opened (Gamma0 5-300, theta 0.01-0.7, p 2.01-3.5, eps_B 1e-4-0.3)
+    and the core n_ism floor is removed (0.01-400). medium="wind" replaces n_ism
+    by the wind parameter A_star (rho = 5e11 A_star r^-2 g/cm^3).
     """
+    if medium == "wind":
+        medium_param = ParamDefWithPrior("A_star", 1e-3, 10.0, Scale.LOG)
+    elif second_component:
+        medium_param = ParamDefWithPrior("n_ism", 0.01, 400, Scale.LOG)
+    else:
+        medium_param = ParamDefWithPrior("n_ism", 5, 400, Scale.LOG)
     params = [
         # Core jet (narrow range to avoid bimodal distribution)
         ParamDefWithPrior("E_iso_core", 5e51, 1e53, Scale.LOG),
@@ -58,7 +71,7 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
         ParamDefWithPrior("theta_c_core", 0.001, 1.0, Scale.LOG), 
 
         # Environment & forward shock microphysics
-        ParamDefWithPrior("n_ism", 5, 400, Scale.LOG),
+        medium_param,
         #ParamDefWithPrior("p", 2.1, 2.5, Scale.LINEAR),
         ParamDefWithPrior("p", 2.01, 2.3, Scale.LINEAR),
         ParamDefWithPrior("eps_e", 0.02, 0.1, Scale.LOG),
@@ -79,7 +92,16 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
         ),
     ]
 
-    if include_flare:
+    if include_flare and flare_xray_only:
+        # X-ray-only late-activity component (no optical extrapolation, so no flare_beta);
+        # must still be high at the EP-FXT epoch (7.2 ks) and gone by ~1e5 s.
+        params.extend([
+            ParamDefWithPrior("t_start_flare", 1000, 6000, Scale.LOG),
+            ParamDefWithPrior("tau_rise_flare", 10, 3000, Scale.LOG),
+            ParamDefWithPrior("tau_decay_flare", 500, 50000, Scale.LOG),
+            ParamDefWithPrior("A_flare", 1e-10, 5e-9, Scale.LOG),
+        ])
+    elif include_flare:
         params.extend([
             ParamDefWithPrior("t_start_flare", 1000, 5000, Scale.LOG), 
             ParamDefWithPrior("tau_rise_flare", 10, 2000, Scale.LOG), 
@@ -88,7 +110,20 @@ def make_param_defs(include_flare=True, include_wing=True, include_cal=False, ca
             ParamDefWithPrior("flare_beta", 0.5, 1.2, Scale.LINEAR),
         ])
 
-    if include_wing:
+    if include_wing and second_component:
+        params.extend([
+            ParamDefWithPrior("E_iso_wing", 1e50, 1e53, Scale.LOG),
+            ParamDefWithPrior("Gamma0_wing", 5, 300, Scale.LOG),
+            ParamDefWithPrior("theta_c_wing", 0.01, 0.7, Scale.LOG),
+            ParamDefWithPrior("p_wing", 2.01, 3.5, Scale.LINEAR),
+            ParamDefWithPrior("eps_e_wing", 0.01, 1.0, Scale.LOG),
+            ParamDefWithPrior("eps_B_wing", 1e-4, 0.3, Scale.LOG),
+            ParamDefWithPrior("xi_wing", 0.6, 1.0, Scale.LINEAR),
+            # engine-frame emission duration of the second shell: a long duration delays
+            # its deceleration to ~(1+z)*tau_wing and sharpens the optical hump
+            ParamDefWithPrior("tau_wing", 10, 3000, Scale.LOG),
+        ])
+    elif include_wing:
         params.extend([
             ParamDefWithPrior("E_iso_wing", 1e51, 1e53, Scale.LOG), 
             ParamDefWithPrior("Gamma0_wing", 10, 100, Scale.LOG),

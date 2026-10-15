@@ -58,8 +58,12 @@ def load_best_fit_params(outdir):
     include_flare = any("t_start_flare" in label for label in labels)
     include_wing = any("E_iso_wing" in label for label in labels)
 
-    # Convert to physical parameters
+    # Convert to physical parameters (fixed parameters recorded by the driver first)
     params = {}
+    cfg = outdir / "fit_config.json"
+    if cfg.exists():
+        import json
+        params.update(json.loads(cfg.read_text()).get("fixed_params", {}) or {})
     for label, value in zip(labels, best_sample):
         if label.startswith("log10_"):
             param_name = label.replace("log10_", "")
@@ -88,13 +92,21 @@ def save_run_arrays(outdir, samples, log_probs, labels, top_k=10):
 
 
 def save_bestfit_params(outdir, labels, param_defs, top_params, top_log_probs,
-                        xrt_data, optical_datasets):
+                        xrt_data, optical_datasets, model_description=None, fixed_params=None):
     """Write the human-readable bestfit_params.txt summary."""
     outdir = Path(outdir)
+    if model_description is None:
+        parts = ["Core+RS"]
+        if any("t_start_flare" in l for l in labels):
+            parts.append("Norris flare" + ("" if any("flare_beta" in l for l in labels) else " (X-ray only)"))
+        if any("E_iso_wing" in l for l in labels):
+            parts.append("second component (wing jet)")
+        model_description = " + ".join(parts) + (" | wind medium" if any("A_star" in l for l in labels) else "")
+    n_ul = len(xrt_data.get('ul_time', []))
     lines = [
         "=== Fit Configuration ===",
-        f"Model: Core+RS + Norris flare + Wing jet",
-        f"XRT data: {len(xrt_data['time'])} points",
+        f"Model: {model_description}",
+        f"XRT data: {len(xrt_data['time'])} points" + (f" + {n_ul} upper limit(s)" if n_ul else ""),
     ]
     for dataset in optical_datasets:
         lines.append(f"{dataset['name']}: {len(dataset['time'])} points")
@@ -110,5 +122,10 @@ def save_bestfit_params(outdir, labels, param_defs, top_params, top_log_probs,
         else:
             physical = sampled
         lines.append(f"{label:<20} {sampled:>14.6g} {physical:>14.6g}")
+    if fixed_params:
+        lines.append("")
+        lines.append("=== Fixed Parameters ===")
+        for k, v in fixed_params.items():
+            lines.append(f"{k:<20} {'(fixed)':>14} {v:>14.6g}")
 
     (outdir / "bestfit_params.txt").write_text("\n".join(lines) + "\n")
